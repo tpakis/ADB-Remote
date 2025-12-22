@@ -21,7 +21,7 @@ class AdbConnection(
     companion object {
         private const val TAG = "AdbConnection"
         private const val CONNECT_TIMEOUT = 5000
-        private const val SYSTEM_IDENTITY = "host::\x00"
+        private const val SYSTEM_IDENTITY = "host::\u0000"
     }
 
     suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -78,7 +78,7 @@ class AdbConnection(
             val input = currentSocket.getInputStream()
 
             // Open a shell service
-            val destination = "shell:$command\x00".toByteArray()
+            val destination = "shell:$command\u0000".toByteArray()
             val currentLocalId = localId++
 
             val openMessage = AdbProtocol.createMessage(
