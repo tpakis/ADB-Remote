@@ -47,8 +47,9 @@ class AdbConnection(
 
             // Read response
             val response = AdbProtocol.readMessage(newSocket.getInputStream())
+                ?: return@withContext Result.failure(Exception("No response from device"))
 
-            when (response?.command) {
+            when (response.command) {
                 AdbProtocol.A_CNXN -> {
                     Log.d(TAG, "Connection established without authentication")
                     isConnected = true
@@ -56,10 +57,10 @@ class AdbConnection(
                 }
                 AdbProtocol.A_AUTH -> {
                     Log.d(TAG, "Authentication required, attempting to authenticate")
-                    handleAuthentication(newSocket)
+                    handleAuthentication(newSocket, response)
                 }
                 else -> {
-                    Result.failure(Exception("Unexpected response: ${AdbProtocol.commandToString(response?.command ?: 0)}"))
+                    Result.failure(Exception("Unexpected response: ${AdbProtocol.commandToString(response.command)}"))
                 }
             }
         } catch (e: Exception) {
@@ -143,7 +144,10 @@ class AdbConnection(
         }
     }
 
-    private suspend fun handleAuthentication(socket: Socket): Result<Unit> = withContext(Dispatchers.IO) {
+    private suspend fun handleAuthentication(
+        socket: Socket,
+        initialAuthResponse: AdbProtocol.AdbMessage
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             if (keyManager == null) {
                 return@withContext Result.failure(Exception(
@@ -155,10 +159,10 @@ class AdbConnection(
             val output = socket.getOutputStream()
             val input = socket.getInputStream()
 
-            // First AUTH message from server contains the token
-            var authResponse = AdbProtocol.readMessage(input)
+            // First AUTH message from server contains the token (already read in connect())
+            var authResponse = initialAuthResponse
 
-            if (authResponse?.command != AdbProtocol.A_AUTH || authResponse.arg0 != AdbProtocol.ADB_AUTH_TOKEN) {
+            if (authResponse.command != AdbProtocol.A_AUTH || authResponse.arg0 != AdbProtocol.ADB_AUTH_TOKEN) {
                 return@withContext Result.failure(Exception("Expected AUTH TOKEN message"))
             }
 
@@ -183,8 +187,9 @@ class AdbConnection(
 
             // Read response
             authResponse = AdbProtocol.readMessage(input)
+                ?: return@withContext Result.failure(Exception("No response after sending signature"))
 
-            when (authResponse?.command) {
+            when (authResponse.command) {
                 AdbProtocol.A_CNXN -> {
                     Log.d(TAG, "Authentication successful with signature")
                     isConnected = true
@@ -206,8 +211,9 @@ class AdbConnection(
 
                     // Read final response
                     val finalResponse = AdbProtocol.readMessage(input)
+                        ?: return@withContext Result.failure(Exception("No response after sending public key"))
 
-                    if (finalResponse?.command == AdbProtocol.A_CNXN) {
+                    if (finalResponse.command == AdbProtocol.A_CNXN) {
                         Log.d(TAG, "Authentication successful with public key")
                         isConnected = true
                         return@withContext Result.success(Unit)
@@ -219,7 +225,7 @@ class AdbConnection(
                 }
                 else -> {
                     return@withContext Result.failure(Exception(
-                        "Unexpected response during authentication: ${AdbProtocol.commandToString(authResponse?.command ?: 0)}"
+                        "Unexpected response during authentication: ${AdbProtocol.commandToString(authResponse.command)}"
                     ))
                 }
             }
