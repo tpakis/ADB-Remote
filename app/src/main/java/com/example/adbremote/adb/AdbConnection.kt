@@ -84,6 +84,8 @@ class AdbConnection(
             val destination = "shell:$command\u0000".toByteArray()
             val currentLocalId = localId++
 
+            Log.d(TAG, "Opening stream with localId=$currentLocalId for command: $command")
+
             val openMessage = AdbProtocol.createMessage(
                 AdbProtocol.A_OPEN,
                 currentLocalId,
@@ -95,17 +97,16 @@ class AdbConnection(
             output.flush()
 
             // Wait for OKAY response
-            var openResponse = AdbProtocol.readMessage(input)
+            val openResponse = AdbProtocol.readMessage(input)
 
-            // If we receive CLSE instead of OKAY, it might be a leftover message from previous stream
-            // Try reading one more message
-            if (openResponse?.command == AdbProtocol.A_CLSE) {
-                Log.w(TAG, "Received unexpected CLSE when expecting OKAY, reading next message")
-                openResponse = AdbProtocol.readMessage(input)
-            }
+            Log.d(TAG, "Received response to OPEN: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}, " +
+                      "arg0=${openResponse?.arg0}, arg1=${openResponse?.arg1}")
 
             if (openResponse?.command != AdbProtocol.A_OKAY) {
-                return@withContext Result.failure(IOException("Failed to open shell: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}"))
+                return@withContext Result.failure(IOException(
+                    "Failed to open shell: ${AdbProtocol.commandToString(openResponse?.command ?: 0)} " +
+                    "(expected OKAY for localId=$currentLocalId)"
+                ))
             }
 
             val remoteId = openResponse.arg0
@@ -130,21 +131,16 @@ class AdbConnection(
                         output.flush()
                     }
                     AdbProtocol.A_CLSE -> {
-                        // Stream closed by server
-                        // Server sends: CLSE(server_local_id, client_local_id)
-                        // We respond:   CLSE(client_local_id, server_local_id)
+                        // Stream closed by server, acknowledge it
                         val closeMessage = AdbProtocol.createMessage(
                             AdbProtocol.A_CLSE,
-                            message.arg1,  // Our local_id (from server's arg1)
-                            message.arg0   // Server's local_id (from server's arg0)
+                            currentLocalId,
+                            remoteId
                         )
                         output.write(closeMessage)
                         output.flush()
 
-                        Log.d(TAG, "Stream closed, sent CLSE response")
-
-                        // Give the server time to process the close
-                        delay(50)
+                        Log.d(TAG, "Received CLSE from server for stream $currentLocalId, sent acknowledgment")
                         break
                     }
                     else -> {
