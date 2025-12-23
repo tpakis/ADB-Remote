@@ -26,7 +26,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: AdbViewModel = viewModel()
+                    val viewModel: AdbViewModel = viewModel(
+                        factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+                    )
                     AdbRemoteApp(viewModel = viewModel)
                 }
             }

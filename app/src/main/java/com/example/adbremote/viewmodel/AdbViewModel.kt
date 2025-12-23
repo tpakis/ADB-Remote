@@ -1,9 +1,11 @@
 package com.example.adbremote.viewmodel
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.adbremote.adb.AdbConnection
+import com.example.adbremote.adb.AdbKeyManager
 import com.example.adbremote.model.AdbDevice
 import com.example.adbremote.model.CommandResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +23,18 @@ data class AdbUiState(
     val errorMessage: String? = null
 )
 
-class AdbViewModel : ViewModel() {
+class AdbViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(AdbUiState())
     val uiState: StateFlow<AdbUiState> = _uiState.asStateFlow()
 
     private var currentConnection: AdbConnection? = null
+    private val keyManager: AdbKeyManager
+
+    init {
+        // Initialize the key manager for ADB authentication
+        keyManager = AdbKeyManager(application.applicationContext)
+        keyManager.initialize()
+    }
 
     companion object {
         private const val TAG = "AdbViewModel"
@@ -76,7 +85,7 @@ class AdbViewModel : ViewModel() {
             _uiState.update { it.copy(isConnecting = true, errorMessage = null) }
 
             try {
-                val connection = AdbConnection(device.host, device.port)
+                val connection = AdbConnection(device.host, device.port, keyManager)
                 val result = connection.connect()
 
                 result.fold(
