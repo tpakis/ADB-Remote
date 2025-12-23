@@ -5,16 +5,19 @@ An Android application that allows you to send ADB (Android Debug Bridge) comman
 ## Features
 
 - Connect to Android devices over TCP/IP
+- **RSA Authentication Support** - Automatically authenticates with devices using RSA key signing
 - Execute ADB shell commands remotely
 - View command history and output
 - Modern Material Design 3 UI with Jetpack Compose
 - Dark/Light theme support
+- Persistent key storage for seamless reconnection
 
 ## Requirements
 
 - Android device running Android 8.0 (API 26) or higher
 - Target device must have ADB over TCP/IP enabled
 - Both devices must be on the same network
+- For first-time connection with authentication: accept the connection prompt on the target device
 
 ## Setting Up Target Device
 
@@ -56,6 +59,7 @@ If your target device is rooted, you can enable ADB over TCP/IP directly on the 
 2. **Connect to Device**
    - Select the device from the list
    - Tap "Connect"
+   - If connecting for the first time, you'll need to accept the connection on the target device (similar to USB debugging authorization)
    - Once connected, the "Commands" tab will become available
 
 3. **Execute Commands**
@@ -80,9 +84,14 @@ The app includes several quick command shortcuts:
 - Ensure the IP address is correct
 - Check that no firewall is blocking port 5555
 
-### Authentication Required Error
+### Authentication
 
-The target device requires authentication. This typically means ADB over TCP/IP wasn't properly enabled. Follow the setup instructions above to enable it first.
+The app automatically handles ADB authentication using RSA keys:
+- On first connection, the app generates an RSA key pair
+- The public key is sent to the target device
+- You'll see a prompt on the target device to accept the connection
+- Once accepted, future connections to that device will be automatic
+- Keys are stored securely in the app's private storage
 
 ### Command Execution Failed
 
@@ -104,9 +113,11 @@ ADB over TCP/IP is a powerful feature that should be used carefully:
 
 This app implements the ADB wire protocol to communicate with devices:
 - Connection establishment (CNXN)
+- RSA authentication (AUTH with TOKEN, SIGNATURE, RSAPUBLICKEY)
 - Command execution through shell service
 - Binary protocol with checksums
 - Support for streaming output
+- Automatic key generation and management
 
 ### Architecture
 
