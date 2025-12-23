@@ -2,6 +2,7 @@ package com.example.adbremote.adb
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -94,7 +95,15 @@ class AdbConnection(
             output.flush()
 
             // Wait for OKAY response
-            val openResponse = AdbProtocol.readMessage(input)
+            var openResponse = AdbProtocol.readMessage(input)
+
+            // If we receive CLSE instead of OKAY, it might be a leftover message from previous stream
+            // Try reading one more message
+            if (openResponse?.command == AdbProtocol.A_CLSE) {
+                Log.w(TAG, "Received unexpected CLSE when expecting OKAY, reading next message")
+                openResponse = AdbProtocol.readMessage(input)
+            }
+
             if (openResponse?.command != AdbProtocol.A_OKAY) {
                 return@withContext Result.failure(IOException("Failed to open shell: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}"))
             }
@@ -121,14 +130,21 @@ class AdbConnection(
                         output.flush()
                     }
                     AdbProtocol.A_CLSE -> {
-                        // Stream closed
+                        // Stream closed by server
+                        // Server sends: CLSE(server_local_id, client_local_id)
+                        // We respond:   CLSE(client_local_id, server_local_id)
                         val closeMessage = AdbProtocol.createMessage(
                             AdbProtocol.A_CLSE,
-                            currentLocalId,
-                            remoteId
+                            message.arg1,  // Our local_id (from server's arg1)
+                            message.arg0   // Server's local_id (from server's arg0)
                         )
                         output.write(closeMessage)
                         output.flush()
+
+                        Log.d(TAG, "Stream closed, sent CLSE response")
+
+                        // Give the server time to process the close
+                        delay(50)
                         break
                     }
                     else -> {
