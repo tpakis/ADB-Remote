@@ -80,6 +80,13 @@ class AdbConnection(
             val output = currentSocket.getOutputStream()
             val input = currentSocket.getInputStream()
 
+            // Check if there are any lingering messages and drain them
+            // This can happen if previous stream had leftover CLSE messages
+            while (input.available() > 0) {
+                val lingering = AdbProtocol.readMessage(input)
+                Log.w(TAG, "Draining lingering message before opening stream: ${AdbProtocol.commandToString(lingering?.command ?: 0)}")
+            }
+
             // Open a shell service
             val destination = "shell:$command\u0000".toByteArray()
             val currentLocalId = localId++
@@ -142,15 +149,9 @@ class AdbConnection(
 
                         Log.d(TAG, "Received CLSE from server for stream $currentLocalId, sent acknowledgment")
 
-                        // Wait for server's acknowledgment of our CLSE
-                        // This prevents the next stream from reading this leftover message
-                        val closeAck = AdbProtocol.readMessage(input)
-                        if (closeAck?.command == AdbProtocol.A_CLSE &&
-                            closeAck.arg0 == remoteId && closeAck.arg1 == currentLocalId) {
-                            Log.d(TAG, "Received server's CLSE acknowledgment for stream $currentLocalId")
-                        } else {
-                            Log.w(TAG, "Unexpected message after CLSE: ${AdbProtocol.commandToString(closeAck?.command ?: 0)}")
-                        }
+                        // Note: In ADB protocol, there's no separate acknowledgment to our CLSE
+                        // The stream is now closed on both sides
+                        // Just break and let the next command start fresh
                         break
                     }
                     else -> {
