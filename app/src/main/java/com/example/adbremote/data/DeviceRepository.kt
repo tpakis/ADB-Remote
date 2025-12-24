@@ -19,6 +19,8 @@ class DeviceRepository(context: Context) {
         private const val KEY_DEVICES = "devices"
         private const val KEY_LAST_DEVICE_HOST = "last_device_host"
         private const val KEY_LAST_DEVICE_PORT = "last_device_port"
+        private const val KEY_RECENT_COMMANDS = "recent_commands"
+        private const val MAX_RECENT_COMMANDS = 10
     }
 
     /**
@@ -88,6 +90,48 @@ class DeviceRepository(context: Context) {
             Pair(host, port)
         } else {
             null
+        }
+    }
+
+    /**
+     * Save a successful command to recent commands list
+     * Keeps the last 10 unique commands, most recent first
+     */
+    suspend fun addRecentCommand(command: String) = withContext(Dispatchers.IO) {
+        val recentCommands = loadRecentCommands().toMutableList()
+
+        // Remove if already exists (to move it to front)
+        recentCommands.remove(command)
+
+        // Add to front
+        recentCommands.add(0, command)
+
+        // Keep only last 10
+        val trimmedCommands = recentCommands.take(MAX_RECENT_COMMANDS)
+
+        // Save
+        val jsonArray = JSONArray()
+        trimmedCommands.forEach { jsonArray.put(it) }
+        prefs.edit().putString(KEY_RECENT_COMMANDS, jsonArray.toString()).apply()
+    }
+
+    /**
+     * Load recent commands list
+     */
+    suspend fun loadRecentCommands(): List<String> = withContext(Dispatchers.IO) {
+        val commandsJson = prefs.getString(KEY_RECENT_COMMANDS, null) ?: return@withContext emptyList()
+
+        try {
+            val jsonArray = JSONArray(commandsJson)
+            val commands = mutableListOf<String>()
+
+            for (i in 0 until jsonArray.length()) {
+                commands.add(jsonArray.getString(i))
+            }
+
+            commands
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 

@@ -1,9 +1,11 @@
 package com.example.adbremote.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -40,6 +42,12 @@ fun CommandScreen(
             .padding(16.dp)
     ) {
         // Quick commands
+        Text(
+            text = "Quick Commands",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -58,6 +66,30 @@ fun CommandScreen(
                 label = "Top Processes",
                 onClick = { onExecuteCommand("top -n 1") }
             )
+        }
+
+        // Recent commands
+        if (uiState.recentCommands.isNotEmpty()) {
+            Text(
+                text = "Recent Commands",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                uiState.recentCommands.forEach { command ->
+                    QuickCommandChip(
+                        label = command,
+                        onClick = { onExecuteCommand(command) }
+                    )
+                }
+            }
         }
 
         // Command history header

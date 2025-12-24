@@ -19,6 +19,7 @@ data class AdbUiState(
     val devices: List<AdbDevice> = emptyList(),
     val selectedDevice: AdbDevice? = null,
     val commandHistory: List<CommandResult> = emptyList(),
+    val recentCommands: List<String> = emptyList(),
     val isConnecting: Boolean = false,
     val isExecuting: Boolean = false,
     val errorMessage: String? = null
@@ -52,7 +53,8 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val savedDevices = deviceRepository.loadDevices()
-                _uiState.update { it.copy(devices = savedDevices) }
+                val recentCommands = deviceRepository.loadRecentCommands()
+                _uiState.update { it.copy(devices = savedDevices, recentCommands = recentCommands) }
 
                 // Try to auto-reconnect to last device
                 val lastDevice = deviceRepository.getLastConnectedDevice()
@@ -208,6 +210,13 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
 
                 result.fold(
                     onSuccess = { output ->
+                        // Save successful command to recent commands
+                        viewModelScope.launch {
+                            deviceRepository.addRecentCommand(command)
+                            val updatedRecentCommands = deviceRepository.loadRecentCommands()
+                            _uiState.update { it.copy(recentCommands = updatedRecentCommands) }
+                        }
+
                         _uiState.update { currentState ->
                             currentState.copy(
                                 isExecuting = false,
