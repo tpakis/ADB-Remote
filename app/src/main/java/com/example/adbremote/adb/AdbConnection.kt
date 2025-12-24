@@ -190,7 +190,8 @@ class AdbConnection(
             }
 
             val token = authResponse.data
-            Log.d(TAG, "Received authentication token (${token.size} bytes)")
+            Log.i(TAG, "=== Starting ADB Authentication ===")
+            Log.i(TAG, "Received authentication token (${token.size} bytes)")
 
             // Sign the token with our private key
             val signature = keyManager.signToken(token)
@@ -198,7 +199,7 @@ class AdbConnection(
                 return@withContext Result.failure(Exception("Failed to sign authentication token"))
             }
 
-            Log.d(TAG, "Sending signature (${signature.size} bytes)")
+            Log.i(TAG, "Sending signed signature (${signature.size} bytes) - if device has our key, this should work")
             val signatureMessage = AdbProtocol.createMessage(
                 AdbProtocol.A_AUTH,
                 AdbProtocol.ADB_AUTH_SIGNATURE,
@@ -214,15 +215,18 @@ class AdbConnection(
 
             when (authResponse.command) {
                 AdbProtocol.A_CNXN -> {
-                    Log.d(TAG, "Authentication successful with signature")
+                    Log.i(TAG, "✓ Authentication successful with signature - device recognized our key!")
+                    Log.i(TAG, "This means 'Always allow' is working correctly")
                     isConnected = true
                     return@withContext Result.success(Unit)
                 }
                 AdbProtocol.A_AUTH -> {
                     // Server doesn't have our public key, send it
-                    Log.d(TAG, "Signature not recognized, sending public key")
+                    Log.i(TAG, "✗ Signature not recognized - device doesn't have our key yet")
+                    Log.i(TAG, "Sending public key for authorization (user will see dialog)")
 
                     val publicKey = keyManager.getPublicKeyForAdb()
+                    Log.i(TAG, "Public key size: ${publicKey.size} bytes")
                     val publicKeyMessage = AdbProtocol.createMessage(
                         AdbProtocol.A_AUTH,
                         AdbProtocol.ADB_AUTH_RSAPUBLICKEY,
@@ -237,10 +241,12 @@ class AdbConnection(
                         ?: return@withContext Result.failure(Exception("No response after sending public key"))
 
                     if (finalResponse.command == AdbProtocol.A_CNXN) {
-                        Log.d(TAG, "Authentication successful with public key")
+                        Log.i(TAG, "✓ Authentication successful with public key")
+                        Log.i(TAG, "If you selected 'Always allow', next connection should use signature auth")
                         isConnected = true
                         return@withContext Result.success(Unit)
                     } else {
+                        Log.e(TAG, "✗ Authentication rejected by device")
                         return@withContext Result.failure(Exception(
                             "Authentication rejected by device. Please accept the connection on the target device."
                         ))

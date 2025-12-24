@@ -19,7 +19,7 @@ import com.example.adbremote.viewmodel.AdbUiState
 @Composable
 fun DeviceListScreen(
     uiState: AdbUiState,
-    onAddDevice: (String, Int) -> Unit,
+    onAddDevice: (String) -> Unit,
     onRemoveDevice: (AdbDevice) -> Unit,
     onSelectDevice: (AdbDevice) -> Unit,
     onConnect: () -> Unit,
@@ -159,8 +159,8 @@ fun DeviceListScreen(
     if (showAddDialog) {
         AddDeviceDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { host, port ->
-                onAddDevice(host, port)
+            onAdd = { input ->
+                onAddDevice(input)
                 showAddDialog = false
             }
         )
@@ -225,35 +225,71 @@ fun DeviceCard(
 @Composable
 fun AddDeviceDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, Int) -> Unit
+    onAdd: (String) -> Unit
 ) {
-    var host by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("5555") }
+    var deviceInput by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Device") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Quick add buttons for host emulators
+                Text(
+                    text = "Connect to Host Emulator (from this emulator/device)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { deviceInput = "emulator-5554@host" },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Emu-5554", style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(
+                        onClick = { deviceInput = "emulator-5556@host" },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Emu-5556", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // Manual input
+                Text(
+                    text = "Or Enter Manually",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 OutlinedTextField(
-                    value = host,
-                    onValueChange = { host = it },
-                    label = { Text("IP Address") },
-                    placeholder = { Text("192.168.1.100") },
+                    value = deviceInput,
+                    onValueChange = { deviceInput = it },
+                    label = { Text("Device Address") },
+                    placeholder = { Text("emulator-5554 or 192.168.1.100:5555") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = port,
-                    onValueChange = { port = it },
-                    label = { Text("Port") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+
+                // Help text
+                Text(
+                    text = "Examples:\n" +
+                           "• Host emulator: emulator-5554@host or emulator-5556@host\n" +
+                           "• Same emulator: emulator-5554 (connects to itself)\n" +
+                           "• IP address: 192.168.1.100:5555\n" +
+                           "• IP default port: 192.168.1.100",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Note: The target device must have ADB over TCP/IP enabled. " +
-                           "Run 'adb tcpip 5555' on the target device first.",
+                    text = "Important:\n" +
+                           "• Use @host when connecting from an emulator to another emulator on the host machine (10.0.2.2)\n" +
+                           "• Without @host uses 127.0.0.1 (only works for self-connection)\n" +
+                           "• Physical devices: Use actual IP address with 'adb tcpip 5555' enabled first",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -262,12 +298,11 @@ fun AddDeviceDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val portInt = port.toIntOrNull() ?: 5555
-                    if (host.isNotBlank()) {
-                        onAdd(host.trim(), portInt)
+                    if (deviceInput.isNotBlank()) {
+                        onAdd(deviceInput.trim())
                     }
                 },
-                enabled = host.isNotBlank()
+                enabled = deviceInput.isNotBlank()
             ) {
                 Text("Add")
             }

@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.adbremote.adb.AdbConnection
 import com.example.adbremote.adb.AdbKeyManager
+import com.example.adbremote.data.DeviceRepository
 import com.example.adbremote.model.AdbDevice
 import com.example.adbremote.model.CommandResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,30 +30,75 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentConnection: AdbConnection? = null
     private val keyManager: AdbKeyManager
+    private val deviceRepository: DeviceRepository
 
     init {
         // Initialize the key manager for ADB authentication
         keyManager = AdbKeyManager(application.applicationContext)
         keyManager.initialize()
+
+        // Initialize device repository
+        deviceRepository = DeviceRepository(application.applicationContext)
+
+        // Load saved devices
+        loadDevices()
     }
 
     companion object {
         private const val TAG = "AdbViewModel"
     }
 
-    fun addDevice(host: String, port: Int = 5555) {
-        val name = "$host:$port"
-        val device = AdbDevice(name = name, host = host, port = port)
+    private fun loadDevices() {
+        viewModelScope.launch {
+            try {
+                val savedDevices = deviceRepository.loadDevices()
+                _uiState.update { it.copy(devices = savedDevices) }
+
+                // Try to auto-reconnect to last device
+                val lastDevice = deviceRepository.getLastConnectedDevice()
+                if (lastDevice != null) {
+                    val (host, port) = lastDevice
+                    val device = savedDevices.find { it.host == host && it.port == port }
+                    if (device != null) {
+                        _uiState.update { it.copy(selectedDevice = device) }
+                        Log.d(TAG, "Auto-selected last connected device: ${device.name}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load devices", e)
+            }
+        }
+    }
+
+    private fun saveDevices() {
+        viewModelScope.launch {
+            try {
+                deviceRepository.saveDevices(_uiState.value.devices)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save devices", e)
+            }
+        }
+    }
+
+    fun addDevice(input: String) {
+        val device = AdbDevice.fromInput(input)
+
+        if (device == null) {
+            _uiState.update { it.copy(errorMessage = "Invalid device format. Use 'emulator-5554' or '192.168.1.100:5555'") }
+            return
+        }
 
         _uiState.update { currentState ->
-            val existingDevice = currentState.devices.find { it.host == host && it.port == port }
+            val existingDevice = currentState.devices.find { it.host == device.host && it.port == device.port }
             if (existingDevice != null) {
                 currentState.copy(errorMessage = "Device already added")
             } else {
-                currentState.copy(
+                val newState = currentState.copy(
                     devices = currentState.devices + device,
                     errorMessage = null
                 )
+                saveDevices()
+                newState
             }
         }
     }
@@ -67,6 +113,7 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
                 devices = currentState.devices - device
             )
         }
+        saveDevices()
     }
 
     fun selectDevice(device: AdbDevice) {
@@ -103,6 +150,10 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
                                     }
                                 }
                             )
+                        }
+                        // Save last connected device
+                        viewModelScope.launch {
+                            deviceRepository.saveLastConnectedDevice(device)
                         }
                         Log.d(TAG, "Connected to ${device.name}")
                     },
