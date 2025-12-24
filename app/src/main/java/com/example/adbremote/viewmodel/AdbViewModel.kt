@@ -195,7 +195,19 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnect() {
         currentConnection?.disconnect()
         currentConnection = null
+        updateDisconnectedState()
+    }
 
+    /**
+     * Handle connection lost (socket died without explicit disconnect)
+     * This doesn't try to close the socket since it's already dead
+     */
+    private fun handleConnectionLost() {
+        currentConnection = null
+        updateDisconnectedState()
+    }
+
+    private fun updateDisconnectedState() {
         _uiState.update { currentState ->
             val device = currentState.selectedDevice
             currentState.copy(
@@ -214,7 +226,10 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
     fun executeCommand(command: String) {
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
-            _uiState.update { it.copy(errorMessage = "Not connected to device") }
+            // Connection is dead - update UI state to reflect this
+            Log.w(TAG, "Connection is dead, updating UI state")
+            handleConnectionLost()
+            _uiState.update { it.copy(errorMessage = "Connection lost. Please reconnect.") }
             return
         }
 
