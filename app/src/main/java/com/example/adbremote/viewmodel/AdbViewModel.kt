@@ -54,17 +54,29 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val savedDevices = deviceRepository.loadDevices()
                 val recentCommands = deviceRepository.loadRecentCommands()
-                _uiState.update { it.copy(devices = savedDevices, recentCommands = recentCommands) }
 
-                // Try to auto-reconnect to last device
+                // Try to find last connected device
                 val lastDevice = deviceRepository.getLastConnectedDevice()
-                if (lastDevice != null) {
+                val selectedDevice = if (lastDevice != null) {
                     val (host, port) = lastDevice
                     val device = savedDevices.find { it.host == host && it.port == port }
                     if (device != null) {
-                        _uiState.update { it.copy(selectedDevice = device) }
                         Log.d(TAG, "Auto-selected last connected device: ${device.name}")
+                        device
+                    } else {
+                        null
                     }
+                } else {
+                    null
+                }
+
+                // Single atomic state update with all loaded data
+                _uiState.update {
+                    it.copy(
+                        devices = savedDevices,
+                        recentCommands = recentCommands,
+                        selectedDevice = selectedDevice
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load devices", e)
@@ -90,19 +102,23 @@ class AdbViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        _uiState.update { currentState ->
-            val existingDevice = currentState.devices.find { it.host == device.host && it.port == device.port }
-            if (existingDevice != null) {
-                currentState.copy(errorMessage = "Device already added")
-            } else {
-                val newState = currentState.copy(
-                    devices = currentState.devices + device,
-                    errorMessage = null
-                )
-                saveDevices()
-                newState
-            }
+        // Check if device already exists
+        val existingDevice = _uiState.value.devices.find { it.host == device.host && it.port == device.port }
+        if (existingDevice != null) {
+            _uiState.update { it.copy(errorMessage = "Device already added") }
+            return
         }
+
+        // Add device to state
+        _uiState.update { currentState ->
+            currentState.copy(
+                devices = currentState.devices + device,
+                errorMessage = null
+            )
+        }
+
+        // Save after state is updated
+        saveDevices()
     }
 
     fun removeDevice(device: AdbDevice) {

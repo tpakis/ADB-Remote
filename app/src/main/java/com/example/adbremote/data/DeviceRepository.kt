@@ -39,13 +39,18 @@ class DeviceRepository(context: Context) {
         }
 
         prefs.edit().putString(KEY_DEVICES, jsonArray.toString()).apply()
+        android.util.Log.d("DeviceRepository", "Saved ${devices.size} devices: ${devices.map { it.name }}")
     }
 
     /**
      * Load the list of devices from persistent storage
      */
     suspend fun loadDevices(): List<AdbDevice> = withContext(Dispatchers.IO) {
-        val devicesJson = prefs.getString(KEY_DEVICES, null) ?: return@withContext emptyList()
+        val devicesJson = prefs.getString(KEY_DEVICES, null)
+        if (devicesJson == null) {
+            android.util.Log.d("DeviceRepository", "No saved devices found")
+            return@withContext emptyList()
+        }
 
         try {
             val jsonArray = JSONArray(devicesJson)
@@ -63,8 +68,10 @@ class DeviceRepository(context: Context) {
                 devices.add(device)
             }
 
+            android.util.Log.d("DeviceRepository", "Loaded ${devices.size} devices: ${devices.map { it.name }}")
             devices
         } catch (e: Exception) {
+            android.util.Log.e("DeviceRepository", "Failed to load devices", e)
             emptyList()
         }
     }
