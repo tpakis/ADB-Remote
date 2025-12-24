@@ -141,6 +141,16 @@ class AdbConnection(
                         output.flush()
 
                         Log.d(TAG, "Received CLSE from server for stream $currentLocalId, sent acknowledgment")
+
+                        // Wait for server's acknowledgment of our CLSE
+                        // This prevents the next stream from reading this leftover message
+                        val closeAck = AdbProtocol.readMessage(input)
+                        if (closeAck?.command == AdbProtocol.A_CLSE &&
+                            closeAck.arg0 == remoteId && closeAck.arg1 == currentLocalId) {
+                            Log.d(TAG, "Received server's CLSE acknowledgment for stream $currentLocalId")
+                        } else {
+                            Log.w(TAG, "Unexpected message after CLSE: ${AdbProtocol.commandToString(closeAck?.command ?: 0)}")
+                        }
                         break
                     }
                     else -> {
