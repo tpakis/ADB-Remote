@@ -5,13 +5,18 @@ import com.example.adbremote.adb.AdbKeyManager
 import com.example.adbremote.data.DeviceRepository
 import com.example.adbremote.model.AdbDevice
 import com.example.adbremote.model.CommandResult
+import com.example.adbremote.platform.DiscoveredDevice
+import com.example.adbremote.platform.NetworkScanner
 import com.example.adbremote.platform.PlatformCrypto
 import com.example.adbremote.platform.PlatformLogger
 import com.example.adbremote.platform.PlatformStorage
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,6 +36,8 @@ class AdbController(
     private var currentConnection: AdbConnection? = null
     private val keyManager: AdbKeyManager
     private val deviceRepository: DeviceRepository
+    private val networkScanner = NetworkScanner()
+    private var scanJob: Job? = null
 
     companion object {
         private const val TAG = "AdbController"
@@ -290,5 +297,62 @@ class AdbController(
 
     fun cleanup() {
         disconnect()
+        stopScan()
+    }
+
+    /**
+     * Start scanning the local network for ADB-enabled devices.
+     */
+    fun startScan() {
+        // Cancel any existing scan
+        stopScan()
+
+        _uiState.update { it.copy(isScanning = true, discoveredDevices = emptyList()) }
+
+        scanJob = scope.launch {
+            networkScanner.scanNetwork()
+                .catch { e ->
+                    PlatformLogger.e(TAG, "Scan error", e)
+                }
+                .onCompletion {
+                    _uiState.update { it.copy(isScanning = false) }
+                }
+                .collect { device ->
+                    _uiState.update { currentState ->
+                        // Avoid duplicates
+                        if (currentState.discoveredDevices.none { it.ipAddress == device.ipAddress }) {
+                            currentState.copy(
+                                discoveredDevices = currentState.discoveredDevices + device
+                            )
+                        } else {
+                            currentState
+                        }
+                    }
+                }
+        }
+    }
+
+    /**
+     * Stop any ongoing network scan.
+     */
+    fun stopScan() {
+        networkScanner.cancelScan()
+        scanJob?.cancel()
+        scanJob = null
+        _uiState.update { it.copy(isScanning = false) }
+    }
+
+    /**
+     * Add a discovered device to the device list.
+     */
+    fun addDiscoveredDevice(device: DiscoveredDevice) {
+        addDevice("${device.ipAddress}:${device.port}")
+    }
+
+    /**
+     * Clear the list of discovered devices.
+     */
+    fun clearDiscoveredDevices() {
+        _uiState.update { it.copy(discoveredDevices = emptyList()) }
     }
 }

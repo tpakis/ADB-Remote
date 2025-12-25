@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.adbremote.model.AdbDevice
+import com.example.adbremote.platform.DiscoveredDevice
 import com.example.adbremote.viewmodel.AdbUiState
 
 @Composable
@@ -23,6 +24,9 @@ fun DeviceListScreen(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onClearError: () -> Unit,
+    onStartScan: () -> Unit = {},
+    onStopScan: () -> Unit = {},
+    onAddDiscoveredDevice: (DiscoveredDevice) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -108,7 +112,7 @@ fun DeviceListScreen(
             }
         }
 
-        // Device list header
+        // Device list header with scan button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,8 +124,118 @@ fun DeviceListScreen(
                 text = "Devices",
                 style = MaterialTheme.typography.titleLarge
             )
-            IconButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add device")
+            Row {
+                // Scan button
+                if (uiState.isScanning) {
+                    TextButton(onClick = onStopScan) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Stop")
+                    }
+                } else {
+                    TextButton(onClick = onStartScan) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Scan")
+                    }
+                }
+                // Add button
+                IconButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add device")
+                }
+            }
+        }
+
+        // Discovered devices section
+        if (uiState.discoveredDevices.isNotEmpty() || uiState.isScanning) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Discovered Devices",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        if (uiState.isScanning) {
+                            Text(
+                                text = "Scanning...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+
+                    if (uiState.discoveredDevices.isEmpty() && uiState.isScanning) {
+                        Text(
+                            text = "Searching for ADB devices on local network...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    } else {
+                        uiState.discoveredDevices.forEach { device ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = device.ipAddress,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    Text(
+                                        text = "Port ${device.port}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                                // Check if device already added
+                                val alreadyAdded = uiState.devices.any {
+                                    it.host == device.ipAddress && it.port == device.port
+                                }
+                                if (alreadyAdded) {
+                                    Text(
+                                        text = "Added",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                    )
+                                } else {
+                                    TextButton(onClick = { onAddDiscoveredDevice(device) }) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Add")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -131,11 +245,18 @@ fun DeviceListScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "No devices added\nTap + to add a device",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No devices added",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Tap Scan to find devices or + to add manually",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         } else {
             LazyColumn(

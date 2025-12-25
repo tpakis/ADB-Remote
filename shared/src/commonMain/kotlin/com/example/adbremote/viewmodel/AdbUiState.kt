@@ -2,6 +2,7 @@ package com.example.adbremote.viewmodel
 
 import com.example.adbremote.model.AdbDevice
 import com.example.adbremote.model.CommandResult
+import com.example.adbremote.platform.DiscoveredDevice
 
 /**
  * UI state for the ADB Remote app.
@@ -14,5 +15,8 @@ data class AdbUiState(
     val recentCommands: List<String> = emptyList(),
     val isConnecting: Boolean = false,
     val isExecuting: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // Network scanning state
+    val isScanning: Boolean = false,
+    val discoveredDevices: List<DiscoveredDevice> = emptyList()
 )

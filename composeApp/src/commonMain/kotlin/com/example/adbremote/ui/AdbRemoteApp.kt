@@ -64,7 +64,10 @@ fun AdbRemoteApp(
                     onSelectDevice = controller::selectDevice,
                     onConnect = controller::connect,
                     onDisconnect = controller::disconnect,
-                    onClearError = controller::clearError
+                    onClearError = controller::clearError,
+                    onStartScan = controller::startScan,
+                    onStopScan = controller::stopScan,
+                    onAddDiscoveredDevice = controller::addDiscoveredDevice
                 )
                 1 -> CommandScreen(
                     uiState = uiState,
