@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.example.adbremote.ui.rcu.Tag
+import com.example.adbremote.ui.remote.RemoteScreen
 import com.example.adbremote.viewmodel.AdbController
 import com.example.adbremote.viewmodel.AdbUiState
 
@@ -43,6 +45,13 @@ fun AdbRemoteApp(
                     onClick = { selectedTab = 1 },
                     enabled = uiState.selectedDevice?.isConnected == true
                 )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text("RCU") },
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    enabled = uiState.selectedDevice?.isConnected == true
+                )
             }
         }
     ) { paddingValues ->
@@ -62,7 +71,21 @@ fun AdbRemoteApp(
                     onExecuteCommand = controller::executeCommand,
                     onClearHistory = controller::clearHistory
                 )
+                2 -> RcuScreen(
+                    uiState = uiState,
+                    onKeyPressed = { tag ->
+                        controller.executeCommand(tag.toAdbCommand())
+                    }
+                )
             }
         }
     }
+}
+
+@Composable
+fun RcuScreen(
+    uiState: AdbUiState,
+    onKeyPressed: (Tag) -> Unit
+) {
+    RemoteScreen(callback = onKeyPressed)
 }
