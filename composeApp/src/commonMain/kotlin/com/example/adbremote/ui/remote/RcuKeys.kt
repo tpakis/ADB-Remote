@@ -6,14 +6,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Adjust
+import androidx.compose.material.icons.filled.FilterTiltShift
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
@@ -60,8 +65,7 @@ private fun RowScope.VolumeKeys(remoteKeyPressed: (Tag) -> Unit) {
 
         // Mute button - using text instead of missing icon
         PddIconButton(
-            imageVector = Icons.Filled.KeyboardArrowDown,
-            iconSize = 12.dp
+            imageVector = Icons.Filled.VolumeMute,
         ) {
             remoteKeyPressed(Tag.VOLUME_MUTE)
         }
@@ -78,7 +82,8 @@ private fun RowScope.VolumeKeys(remoteKeyPressed: (Tag) -> Unit) {
 fun RowScope.DpadKeys(remoteKeyPressed: (Tag) -> Unit) {
     Box(
         modifier = Modifier
-            .size(width = 150.dp, height = 150.dp)
+            .size(width = 100.dp, height = 150.dp)
+            .aspectRatio(1.1f, matchHeightConstraintsFirst = true)
             .weight(1f)
             .padding(6.dp)
             .background(shape = CircleShape, color = backgroundColor()),
@@ -101,7 +106,7 @@ fun RowScope.DpadKeys(remoteKeyPressed: (Tag) -> Unit) {
         // Center/OK button
         PddIconButton(
             modifier = Modifier.align(Alignment.Center).size(30.dp),
-            imageVector = Icons.Default.Add,
+            imageVector = Icons.Default.Adjust,
             iconSize = 20.dp,
         ) {
             remoteKeyPressed(Tag.DPAD_CENTER)

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun NumpadKey(
@@ -21,7 +22,7 @@ fun NumpadKey(
         .size(width = 70.dp, height = 65.dp)
         .padding(4.dp),
     text: String,
-    textColor: Color = Color.White,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
     Button(
@@ -30,16 +31,24 @@ fun NumpadKey(
         shape = RoundedCornerShape(20),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
+            contentColor = textColor
         )
     ) {
         Text(
             text = text,
             fontSize = 20.sp,
-            color = textColor,
             style = TextStyle.Default.copy(fontWeight = FontWeight.Normal),
         )
     }
+}
+
+@Preview
+@Composable
+fun NumpadKeyPreview() {
+    NumpadKey(
+        text = "5",
+        onClick = {}
+    )
 }
 
 @Composable

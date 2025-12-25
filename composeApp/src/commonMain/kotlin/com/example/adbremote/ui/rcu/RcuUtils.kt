@@ -6,6 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.adbremote.ui.icons.BootstrapYoutube
+import com.example.adbremote.ui.icons.TablerBrandAmazon
+import com.example.adbremote.ui.icons.TablerBrandNetflix
 
 // Icon sizes
 val iconSmall: Dp = 16.dp
@@ -38,15 +41,14 @@ val settingsKey = RcuKeyInfo(
 // Deeplinks control keys
 val appsKey = RcuKeyInfo(
     tag = Tag.APPS,
-    icon = Icons.Default.Menu,
+    icon = Icons.Default.Apps,
     title = "Apps"
 )
 
 val recordingsKey = RcuKeyInfo(
     tag = Tag.RECORDINGS,
-    icon = Icons.Default.Star,
+    icon = Icons.Default.VideoLibrary,
     title = "Recordings",
-    tintColor = Color.Red
 )
 
 val searchKey = RcuKeyInfo(
@@ -76,21 +78,20 @@ val menuKey = RcuKeyInfo(
 
 val assistantKey = RcuKeyInfo(
     tag = Tag.ASSISTANT,
-    icon = Icons.Default.Person,
+    icon = Icons.Filled.Mic,
     title = "Assistant"
 )
 
 val powerKey = RcuKeyInfo(
     tag = Tag.POWER,
-    icon = Icons.Default.Warning,
+    icon = Icons.Default.PowerSettingsNew,
     title = "Power",
-    tintColor = Color.Red
 )
 
 // Numpad special keys
 val teletextKey = RcuKeyInfo(
     tag = Tag.TELETEXT,
-    icon = Icons.Default.Edit,
+    icon = Icons.Default.TextFields,
     title = "Teletext"
 )
 
@@ -102,27 +103,27 @@ val previousKey = RcuKeyInfo(
 
 // HbbTV color keys
 val hbbtvKeys = listOf(
-    RcuKeyInfo(tag = Tag.RED, icon = Icons.Default.Star, title = "Red", tintColor = Color.Red),
-    RcuKeyInfo(tag = Tag.GREEN, icon = Icons.Default.Star, title = "Green", tintColor = Color.Green),
-    RcuKeyInfo(tag = Tag.YELLOW, icon = Icons.Default.Star, title = "Yellow", tintColor = Color.Yellow),
-    RcuKeyInfo(tag = Tag.BLUE, icon = Icons.Default.Star, title = "Blue", tintColor = Color.Blue)
+    RcuKeyInfo(tag = Tag.RED, icon = Icons.Filled.HorizontalRule, title = "Red", tintColor = Color.Red),
+    RcuKeyInfo(tag = Tag.GREEN, icon = Icons.Filled.HorizontalRule, title = "Green", tintColor = Color.Green),
+    RcuKeyInfo(tag = Tag.YELLOW, icon = Icons.Filled.HorizontalRule, title = "Yellow", tintColor = Color.Yellow),
+    RcuKeyInfo(tag = Tag.BLUE, icon = Icons.Filled.HorizontalRule, title = "Blue", tintColor = Color.Blue)
 )
 
 // Playback control keys
 val playbackKeys = listOf(
-    RcuKeyInfo(tag = Tag.REWIND, icon = Icons.Default.KeyboardArrowLeft, title = "Rewind"),
+    RcuKeyInfo(tag = Tag.REWIND, icon = Icons.Filled.FastRewind, title = "Rewind"),
     RcuKeyInfo(tag = Tag.PLAY_PAUSE, icon = Icons.Default.PlayArrow, title = "Play/Pause"),
-    RcuKeyInfo(tag = Tag.FAST_FORWARD, icon = Icons.Default.KeyboardArrowRight, title = "Fast Forward"),
-    RcuKeyInfo(tag = Tag.STOP, icon = Icons.Default.Clear, title = "Stop"),
-    RcuKeyInfo(tag = Tag.PREVIOUS, icon = Icons.Default.ArrowBack, title = "Previous"),
-    RcuKeyInfo(tag = Tag.NEXT, icon = Icons.Default.ArrowForward, title = "Next"),
-    RcuKeyInfo(tag = Tag.RECORD, icon = Icons.Default.Star, title = "Record", tintColor = Color.Red),
-    RcuKeyInfo(tag = Tag.CAPTIONS, icon = Icons.Default.Edit, title = "Captions")
+    RcuKeyInfo(tag = Tag.FAST_FORWARD, icon = Icons.Filled.FastForward, title = "Fast Forward"),
+    RcuKeyInfo(tag = Tag.STOP, icon = Icons.Filled.Stop, title = "Stop"),
+    RcuKeyInfo(tag = Tag.PREVIOUS, icon = Icons.Filled.SkipPrevious, title = "Previous"),
+    RcuKeyInfo(tag = Tag.NEXT, icon = Icons.Filled.SkipNext, title = "Next"),
+    RcuKeyInfo(tag = Tag.RECORD, icon = Icons.Filled.Circle, title = "Record", tintColor = Color.Red),
+    RcuKeyInfo(tag = Tag.CAPTIONS, icon = Icons.Default.ClosedCaption, title = "Captions")
 )
 
 // External app keys
 val externalAppsKeys = listOf(
-    RcuKeyInfo(tag = Tag.NETFLIX, icon = Icons.Default.PlayArrow, title = "Netflix", tintColor = Color.Red),
-    RcuKeyInfo(tag = Tag.YOUTUBE, icon = Icons.Default.PlayArrow, title = "YouTube", tintColor = Color.Red),
-    RcuKeyInfo(tag = Tag.PRIME_VIDEO, icon = Icons.Default.PlayArrow, title = "Prime", tintColor = Color.Cyan)
+    RcuKeyInfo(tag = Tag.NETFLIX, icon = TablerBrandNetflix, title = "Netflix", tintColor = Color.Red),
+    RcuKeyInfo(tag = Tag.YOUTUBE, icon = BootstrapYoutube, title = "YouTube", tintColor = Color.Red),
+    RcuKeyInfo(tag = Tag.PRIME_VIDEO, icon = TablerBrandAmazon, title = "Prime", tintColor = Color.Cyan)
 )

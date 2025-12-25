@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,7 +33,7 @@ fun ExternalAppButton(
     onClick: (Tag) -> Unit,
     backgroundColor: Color = Color.Transparent,
     iconSize: Dp = 10.dp,
-    fontColor: Color = Color.White,
+    fontColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Button(
         onClick = { onClick(rcuKeyInfo.tag) },
@@ -45,7 +46,7 @@ fun ExternalAppButton(
             containerColor = backgroundColor,
             contentColor = fontColor
         ),
-        border = BorderStroke(1.dp, Color.White)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface)
     ) {
         Box(
             modifier = Modifier
@@ -69,7 +70,7 @@ fun ExternalAppButton(
                 Text(
                     text = rcuKeyInfo.title,
                     textAlign = TextAlign.Center,
-                    fontSize = 8.sp,
+                    fontSize = 12.sp,
                 )
             }
 

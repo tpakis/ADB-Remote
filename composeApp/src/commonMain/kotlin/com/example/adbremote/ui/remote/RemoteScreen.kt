@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.adbremote.ui.components.*
 import com.example.adbremote.ui.rcu.*
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 typealias StyleDimensions = Pair<Dp, Dp>
 
@@ -69,7 +71,7 @@ fun RemoteScreen(
             modifier = Modifier.padding(top = 24.dp),
             onButtonClicked = callback,
             numpadButtonDimensions = StyleDimensions(60.dp, 60.dp),
-            textColor = Color.White,
+            textColor = MaterialTheme.colorScheme.onSurface,
         )
 
         // Playback controls - using regular Row instead of LazyVerticalGrid
@@ -94,7 +96,7 @@ fun Numpad(
     onButtonClicked: (Tag) -> Unit,
     numpadButtonDimensions: StyleDimensions = StyleDimensions(70.dp, 65.dp),
     iconSize: Dp = 20.dp,
-    textColor: Color = Color.White,
+    textColor: Color = Color.Black,
 ) {
     val numpadTags = listOf(
         listOf(Tag.NUMBER_1, Tag.NUMBER_2, Tag.NUMBER_3),
@@ -118,8 +120,8 @@ fun Numpad(
                         textColor = textColor,
                         onClick = { onButtonClicked(tag) },
                         modifier = Modifier
-                            .size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second)
-                            .padding(4.dp),
+                            .padding(4.dp)
+                            .size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
                     )
                 }
             }
@@ -132,7 +134,7 @@ fun Numpad(
         ) {
             val key1 = teletextKey
             RemoteKey(
-                modifier = Modifier.size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
+                modifier = Modifier.padding(end = 4.dp).size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
                 tag = key1.tag,
                 icon = key1.icon,
                 iconSize = 20.dp,
@@ -145,13 +147,13 @@ fun Numpad(
                 textColor = textColor,
                 onClick = { onButtonClicked(Tag.NUMBER_0) },
                 modifier = Modifier
-                    .size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second)
-                    .padding(4.dp),
+                    .padding(4.dp)
+                    .size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
             )
 
             val key2 = previousKey
             RemoteKey(
-                modifier = Modifier.size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
+                modifier = Modifier.padding(start = 4.dp).size(width = numpadButtonDimensions.first, height = numpadButtonDimensions.second),
                 tag = key2.tag,
                 icon = key2.icon,
                 iconSize = iconSize,
@@ -170,35 +172,26 @@ fun PlaybackControlsRow(
 ) {
     // First row: Rewind, Play/Pause, Fast Forward, Stop
     Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            playbackKeys.take(4).forEach { keyInfo ->
-                RemoteKey(
-                    tag = keyInfo.tag,
-                    icon = keyInfo.icon,
-                    iconSize = iconSize,
-                    iconTintColor = keyInfo.tintColor,
-                    remoteKeyPressed = remoteKeyPressed
-                )
-            }
-        }
-
-        // Second row: Previous, Next, Record, Captions
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            playbackKeys.drop(4).forEach { keyInfo ->
-                RemoteKey(
-                    tag = keyInfo.tag,
-                    icon = keyInfo.icon,
-                    iconSize = iconSize,
-                    iconTintColor = keyInfo.tintColor,
-                    remoteKeyPressed = remoteKeyPressed
-                )
-            }
-        }
+        RemoteKeyRow(remoteKeyPressed = remoteKeyPressed, rcuKeysToDisplay = playbackKeys.take(4))
+        RemoteKeyRow(remoteKeyPressed = remoteKeyPressed, rcuKeysToDisplay = playbackKeys.drop(4))
     }
+}
+
+@Preview
+@Composable
+private fun PlaybackControlsRowPreview() {
+    PlaybackControlsRow(remoteKeyPressed = {})
+}
+
+
+@Preview
+@Composable
+private fun ExternalAppsRowPreview() {
+    ExternalAppsRow(remoteKeyPressed = {})
+}
+
+@Preview
+@Composable
+private fun RemoteScreenPreview() {
+    RemoteScreen(callback = {})
 }

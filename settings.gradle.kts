@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ADB Remote"
+rootProject.name = "ADBRemote"
 include(":shared")
 include(":composeApp")
