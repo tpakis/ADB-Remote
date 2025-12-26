@@ -23,5 +23,9 @@ out/
 .classpath
 app/build/
 */build/
+
+*.klib
+
+.kotlin/metadata/kotlinTransformedCInteropMetadataLibraries/
 CLAUDE.md
 .claude/
