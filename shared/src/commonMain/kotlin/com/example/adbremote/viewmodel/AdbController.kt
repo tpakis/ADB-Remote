@@ -226,6 +226,12 @@ class AdbController(
     }
 
     fun executeCommand(command: String) {
+        // Strip "adb shell" prefix if user accidentally included it
+        val sanitizedCommand = command.trim()
+            .removePrefix("adb shell ")
+            .removePrefix("adb shell")
+            .trim()
+
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
             PlatformLogger.w(TAG, "Connection is dead, updating UI state")
@@ -238,13 +244,13 @@ class AdbController(
             _uiState.update { it.copy(isExecuting = true, errorMessage = null) }
 
             try {
-                val result = connection.executeCommand(command)
+                val result = connection.executeCommand(sanitizedCommand)
 
                 result.fold(
                     onSuccess = { output ->
                         // Save successful command to recent commands
                         scope.launch {
-                            deviceRepository.addRecentCommand(command)
+                            deviceRepository.addRecentCommand(sanitizedCommand)
                             val updatedRecentCommands = deviceRepository.loadRecentCommands()
                             _uiState.update { it.copy(recentCommands = updatedRecentCommands) }
                         }
@@ -253,7 +259,7 @@ class AdbController(
                             currentState.copy(
                                 isExecuting = false,
                                 commandHistory = currentState.commandHistory + CommandResult(
-                                    command = command,
+                                    command = sanitizedCommand,
                                     output = output.ifEmpty { "(no output)" }
                                 )
                             )
@@ -264,7 +270,7 @@ class AdbController(
                             currentState.copy(
                                 isExecuting = false,
                                 commandHistory = currentState.commandHistory + CommandResult(
-                                    command = command,
+                                    command = sanitizedCommand,
                                     output = error.message ?: "Unknown error",
                                     isError = true
                                 )
@@ -277,7 +283,7 @@ class AdbController(
                     currentState.copy(
                         isExecuting = false,
                         commandHistory = currentState.commandHistory + CommandResult(
-                            command = command,
+                            command = sanitizedCommand,
                             output = e.message ?: "Unknown error",
                             isError = true
                         )

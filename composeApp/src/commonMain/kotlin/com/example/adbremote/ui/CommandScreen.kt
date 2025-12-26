@@ -17,6 +17,128 @@ import androidx.compose.ui.unit.dp
 import com.example.adbremote.model.CommandResult
 import com.example.adbremote.viewmodel.AdbUiState
 
+// Data model for predefined commands
+data class PredefinedCommand(
+    val name: String,
+    val command: String,
+    val description: String = ""
+)
+
+data class CommandCategory(
+    val name: String,
+    val commands: List<PredefinedCommand>
+)
+
+val predefinedCommands = listOf(
+    CommandCategory(
+        name = "Accessibility",
+        commands = listOf(
+            PredefinedCommand(
+                name = "Enable TalkBack",
+                command = "settings put secure enabled_accessibility_services com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService",
+                description = "Enable screen reader"
+            ),
+            PredefinedCommand(
+                name = "Disable TalkBack",
+                command = "settings put secure enabled_accessibility_services com.android.talkback/com.google.android.marvin.talkback.TalkBackService",
+                description = "Disable screen reader"
+            ),
+            PredefinedCommand(
+                name = "Font Scale: Default (1.0)",
+                command = "settings put system font_scale 1.0"
+            ),
+            PredefinedCommand(
+                name = "Font Scale: Large (1.15)",
+                command = "settings put system font_scale 1.15"
+            ),
+            PredefinedCommand(
+                name = "Font Scale: Largest (1.30)",
+                command = "settings put system font_scale 1.30"
+            ),
+            PredefinedCommand(
+                name = "Font Scale: Mobile (2.0)",
+                command = "settings put system font_scale 2.0"
+            )
+        )
+    ),
+    CommandCategory(
+        name = "Debug",
+        commands = listOf(
+            PredefinedCommand(
+                name = "List SurfaceViews",
+                command = "dumpsys SurfaceFlinger --list",
+                description = "List all SurfaceViews for all displays"
+            ),
+            PredefinedCommand(
+                name = "Power State",
+                command = "dumpsys power | grep -i wake",
+                description = "Get current system power state"
+            ),
+            PredefinedCommand(
+                name = "Force App Update Check",
+                command = "am broadcast -a otupdate.CHECK_UPDATE_ACTION",
+                description = "Trigger OTA update check"
+            ),
+            PredefinedCommand(
+                name = "Force Config Update Check",
+                command = "am broadcast -a otupdate.CHECK_CONFIG_ACTION",
+                description = "Trigger config update check"
+            ),
+            PredefinedCommand(
+                name = "Force Crash",
+                command = "am broadcast -a debug.CRASH",
+                description = "Debug/QA builds only"
+            ),
+            PredefinedCommand(
+                name = "Force Crash (with reason)",
+                command = "am broadcast -a debug.CRASH --es reason \"test crash\"",
+                description = "Debug/QA builds only"
+            ),
+            PredefinedCommand(
+                name = "Force Native Crash",
+                command = "am broadcast -a debug.NATIVE_CRASH",
+                description = "Debug/QA builds only"
+            ),
+            PredefinedCommand(
+                name = "Force ANR",
+                command = "am broadcast -a debug.ANR",
+                description = "Debug/QA builds, via service start timeout"
+            )
+        )
+    ),
+    CommandCategory(
+        name = "Connectivity",
+        commands = listOf(
+            PredefinedCommand(
+                name = "WiFi: Enable",
+                command = "svc wifi enable"
+            ),
+            PredefinedCommand(
+                name = "WiFi: Disable",
+                command = "svc wifi disable"
+            ),
+            PredefinedCommand(
+                name = "Mobile Data: Enable",
+                command = "svc data enable"
+            ),
+            PredefinedCommand(
+                name = "Mobile Data: Disable",
+                command = "svc data disable"
+            ),
+            PredefinedCommand(
+                name = "Airplane Mode: Enable",
+                command = "cmd connectivity airplane-mode enable",
+                description = "Mobile devices only"
+            ),
+            PredefinedCommand(
+                name = "Airplane Mode: Disable",
+                command = "cmd connectivity airplane-mode disable",
+                description = "Mobile devices only"
+            )
+        )
+    )
+)
+
 @Composable
 fun CommandScreen(
     uiState: AdbUiState,
@@ -25,7 +147,19 @@ fun CommandScreen(
     modifier: Modifier = Modifier
 ) {
     var commandText by remember { mutableStateOf("") }
+    var showCommandBrowser by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    // Command browser dialog
+    if (showCommandBrowser) {
+        CommandBrowserDialog(
+            onDismiss = { showCommandBrowser = false },
+            onCommandSelected = { command ->
+                onExecuteCommand(command)
+                showCommandBrowser = false
+            }
+        )
+    }
 
     // Auto-scroll to bottom when new items are added
     LaunchedEffect(uiState.commandHistory.size) {
@@ -40,12 +174,27 @@ fun CommandScreen(
             .padding(16.dp)
     ) {
         // Quick commands
-        Text(
-            text = "Quick Commands",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Quick Commands",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            IconButton(
+                onClick = { showCommandBrowser = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "Browse commands",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -259,4 +408,110 @@ private fun formatTimestamp(timestamp: Long): String {
     val minutes = (timestamp / 60000) % 60
     val hours = (timestamp / 3600000) % 24
     return "%02d:%02d:%02d".format(hours.toInt(), minutes.toInt(), seconds.toInt())
+}
+
+@Composable
+fun CommandBrowserDialog(
+    onDismiss: () -> Unit,
+    onCommandSelected: (String) -> Unit
+) {
+    var expandedCategory by remember { mutableStateOf<String?>(predefinedCommands.firstOrNull()?.name) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Command Browser")
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                predefinedCommands.forEach { category ->
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column {
+                                // Category header
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = category.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            expandedCategory = if (expandedCategory == category.name) null else category.name
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            if (expandedCategory == category.name)
+                                                Icons.Default.KeyboardArrowUp
+                                            else
+                                                Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Toggle"
+                                        )
+                                    }
+                                }
+
+                                // Commands list (expanded)
+                                if (expandedCategory == category.name) {
+                                    category.commands.forEach { cmd ->
+                                        Surface(
+                                            onClick = { onCommandSelected(cmd.command) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = MaterialTheme.colorScheme.surface
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(
+                                                    horizontal = 12.dp,
+                                                    vertical = 8.dp
+                                                )
+                                            ) {
+                                                Text(
+                                                    text = cmd.name,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                                if (cmd.description.isNotEmpty()) {
+                                                    Text(
+                                                        text = cmd.description,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Text(
+                                                    text = cmd.command,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                    modifier = Modifier.padding(top = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }
