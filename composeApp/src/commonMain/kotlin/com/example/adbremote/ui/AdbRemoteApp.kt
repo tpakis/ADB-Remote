@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.adbremote.platform.PlatformFilePicker
 import com.example.adbremote.platform.PlatformFileSaver
+import com.example.adbremote.platform.saveTextFileAwait
+import com.example.adbremote.platform.saveBinaryFileAwait
 import com.example.adbremote.ui.rcu.Tag
 import com.example.adbremote.ui.remote.RemoteScreen
 import com.example.adbremote.viewmodel.AdbController
@@ -29,39 +31,87 @@ fun AdbRemoteApp(
 
     // State for save-to-file command
     var pendingSaveCommand by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
     var isInstalling by remember { mutableStateOf(false) }
+    var isGeneratingBugreport by remember { mutableStateOf(false) }
+    var pendingBugreportFileName by remember { mutableStateOf<String?>(null) }
+
+    // Track file operation status for UI
+    var fileOperationStatus by remember { mutableStateOf(FileOperationStatus()) }
 
     // Handle save-to-file command execution
     LaunchedEffect(pendingSaveCommand) {
         val (command, defaultFileName) = pendingSaveCommand ?: return@LaunchedEffect
-        isSaving = true
+
+        fileOperationStatus = FileOperationStatus(
+            isInProgress = true,
+            operationName = "Fetching logcat...",
+            fileName = defaultFileName
+        )
 
         // First execute the command
         val result = controller.executeCommandWithResult(command)
 
-        result.fold(
-            onSuccess = { output ->
-                // Then save to file using platform file saver
-                fileSaver.saveTextFile(defaultFileName, output) { path ->
-                    coroutineScope.launch {
-                        if (path != null) {
-                            snackbarHostState.showSnackbar("Saved to: $path")
-                        } else {
-                            snackbarHostState.showSnackbar("Save cancelled or failed")
-                        }
-                    }
-                }
-            },
-            onFailure = { error ->
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Command failed: ${error.message}")
-                }
+        if (result.isSuccess) {
+            val output = result.getOrThrow()
+            fileOperationStatus = FileOperationStatus(
+                isInProgress = true,
+                operationName = "Saving to file...",
+                fileName = defaultFileName
+            )
+            // Save to file and await result
+            val path = fileSaver.saveTextFileAwait(defaultFileName, output)
+            fileOperationStatus = FileOperationStatus()
+            if (path != null) {
+                snackbarHostState.showSnackbar("Saved to: $path")
+            } else {
+                snackbarHostState.showSnackbar("Save cancelled or failed")
             }
+        } else {
+            val error = result.exceptionOrNull()
+            fileOperationStatus = FileOperationStatus()
+            snackbarHostState.showSnackbar("Command failed: ${error?.message}")
+        }
+
+        pendingSaveCommand = null
+    }
+
+    // Handle bugreport generation
+    LaunchedEffect(pendingBugreportFileName) {
+        val defaultFileName = pendingBugreportFileName ?: return@LaunchedEffect
+        isGeneratingBugreport = true
+
+        fileOperationStatus = FileOperationStatus(
+            isInProgress = true,
+            operationName = "Generating bug report...",
+            fileName = defaultFileName
         )
 
-        isSaving = false
-        pendingSaveCommand = null
+        val result = controller.executeBugreport()
+
+        if (result.isSuccess) {
+            val zipData = result.getOrThrow()
+            fileOperationStatus = FileOperationStatus(
+                isInProgress = true,
+                operationName = "Saving bug report...",
+                fileName = defaultFileName
+            )
+            // Save the zip file and await result
+            val path = fileSaver.saveBinaryFileAwait(defaultFileName, zipData, "application/zip")
+            isGeneratingBugreport = false
+            fileOperationStatus = FileOperationStatus()
+            if (path != null) {
+                snackbarHostState.showSnackbar("Bug report saved to: $path")
+            } else {
+                snackbarHostState.showSnackbar("Save cancelled or failed")
+            }
+        } else {
+            val error = result.exceptionOrNull()
+            isGeneratingBugreport = false
+            fileOperationStatus = FileOperationStatus()
+            snackbarHostState.showSnackbar("Bugreport failed: ${error?.message}")
+        }
+
+        pendingBugreportFileName = null
     }
 
     Scaffold(
@@ -119,8 +169,17 @@ fun AdbRemoteApp(
                     uiState = uiState,
                     onExecuteCommand = controller::executeCommand,
                     onSaveToFileCommand = { command, defaultFileName ->
-                        pendingSaveCommand = command to defaultFileName
+                        if (!fileOperationStatus.isInProgress) {
+                            pendingSaveCommand = command to defaultFileName
+                        }
                     },
+                    onBugreport = { defaultFileName ->
+                        if (!isGeneratingBugreport && !fileOperationStatus.isInProgress) {
+                            pendingBugreportFileName = defaultFileName
+                        }
+                    },
+                    isGeneratingBugreport = isGeneratingBugreport,
+                    fileOperationStatus = fileOperationStatus,
                     onInstallApk = {
                         if (isInstalling) return@CommandScreen
                         filePicker.pickFile("application/vnd.android.package-archive") { path ->

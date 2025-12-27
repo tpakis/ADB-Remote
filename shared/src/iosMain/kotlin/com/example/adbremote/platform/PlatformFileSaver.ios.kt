@@ -1,6 +1,8 @@
 package com.example.adbremote.platform
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
@@ -12,7 +14,7 @@ actual class PlatformFileSaver {
         content: String,
         onResult: (path: String?) -> Unit
     ) {
-        withContext(Dispatchers.Default) {
+        val savedPath = withContext(Dispatchers.Default) {
             try {
                 // Save to Documents folder
                 val paths = NSSearchPathForDirectoriesInDomains(
@@ -20,14 +22,7 @@ actual class PlatformFileSaver {
                     NSUserDomainMask,
                     true
                 )
-                val documentsDir = paths.firstOrNull() as? String
-
-                if (documentsDir == null) {
-                    withContext(Dispatchers.Main) {
-                        onResult(null)
-                    }
-                    return@withContext
-                }
+                val documentsDir = paths.firstOrNull() as? String ?: return@withContext null
 
                 var filePath = "$documentsDir/$defaultFileName"
 
@@ -48,19 +43,57 @@ actual class PlatformFileSaver {
                     error = null
                 )
 
-                withContext(Dispatchers.Main) {
-                    if (success) {
-                        onResult(filePath)
-                    } else {
-                        onResult(null)
-                    }
-                }
+                if (success) filePath else null
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    onResult(null)
-                }
+                null
             }
         }
+        // Call callback directly after work is done
+        onResult(savedPath)
+    }
+
+    @OptIn(kotlinx.cinterop.BetaInteropApi::class)
+    actual suspend fun saveBinaryFile(
+        defaultFileName: String,
+        content: ByteArray,
+        mimeType: String,
+        onResult: (path: String?) -> Unit
+    ) {
+        val savedPath = withContext(Dispatchers.Default) {
+            try {
+                // Save to Documents folder
+                val paths = NSSearchPathForDirectoriesInDomains(
+                    NSDocumentDirectory,
+                    NSUserDomainMask,
+                    true
+                )
+                val documentsDir = paths.firstOrNull() as? String ?: return@withContext null
+
+                var filePath = "$documentsDir/$defaultFileName"
+
+                // If file exists, add timestamp to avoid overwriting
+                val fileManager = NSFileManager.defaultManager
+                if (fileManager.fileExistsAtPath(filePath)) {
+                    val timestamp = NSDate().timeIntervalSince1970.toLong()
+                    val nameWithoutExt = defaultFileName.substringBeforeLast(".")
+                    val ext = defaultFileName.substringAfterLast(".", "")
+                    filePath = "$documentsDir/${nameWithoutExt}_${timestamp}.${ext}"
+                }
+
+                // Convert ByteArray to NSData
+                val nsData = content.usePinned { pinned ->
+                    NSData.dataWithBytes(pinned.addressOf(0), content.size.toULong())
+                }
+
+                val success = nsData.writeToFile(filePath, atomically = true)
+
+                if (success) filePath else null
+            } catch (e: Exception) {
+                null
+            }
+        }
+        // Call callback directly after work is done
+        onResult(savedPath)
     }
 }
 

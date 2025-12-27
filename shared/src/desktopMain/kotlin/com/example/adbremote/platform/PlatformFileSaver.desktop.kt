@@ -12,29 +12,39 @@ actual class PlatformFileSaver {
         content: String,
         onResult: (path: String?) -> Unit
     ) {
-        withContext(Dispatchers.Main) {
-            try {
+        saveBinaryFile(defaultFileName, content.toByteArray(), "text/plain", onResult)
+    }
+
+    actual suspend fun saveBinaryFile(
+        defaultFileName: String,
+        content: ByteArray,
+        mimeType: String,
+        onResult: (path: String?) -> Unit
+    ) {
+        val savedPath = try {
+            // Show file dialog on AWT thread (this blocks until user selects)
+            val (directory, filename) = withContext(Dispatchers.Main) {
                 val dialog = FileDialog(null as Frame?, "Save File", FileDialog.SAVE)
                 dialog.file = defaultFileName
                 dialog.isVisible = true
-
-                val directory = dialog.directory
-                val filename = dialog.file
-
-                if (directory != null && filename != null) {
-                    val file = File(directory, filename)
-                    withContext(Dispatchers.IO) {
-                        file.writeText(content)
-                    }
-                    onResult(file.absolutePath)
-                } else {
-                    onResult(null)
-                }
-            } catch (e: Exception) {
-                PlatformLogger.e("PlatformFileSaver", "Failed to save file", e)
-                onResult(null)
+                dialog.directory to dialog.file
             }
+
+            if (directory != null && filename != null) {
+                val file = File(directory, filename)
+                withContext(Dispatchers.IO) {
+                    file.writeBytes(content)
+                }
+                file.absolutePath
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            PlatformLogger.e("PlatformFileSaver", "Failed to save file", e)
+            null
         }
+        // Call callback directly after all work is done
+        onResult(savedPath)
     }
 }
 

@@ -23,7 +23,8 @@ data class PredefinedCommand(
     val command: String,
     val description: String = "",
     val saveToFile: Boolean = false,
-    val defaultFileName: String = ""
+    val defaultFileName: String = "",
+    val isBugreport: Boolean = false  // Special flag for bugreport command
 )
 
 data class CommandCategory(
@@ -72,6 +73,13 @@ val predefinedCommands = listOf(
                 description = "Save logcat output to a file",
                 saveToFile = true,
                 defaultFileName = "logcat.txt"
+            ),
+            PredefinedCommand(
+                name = "Generate Bug Report",
+                command = "bugreport",
+                description = "Generate and save a full bug report (may take minutes)",
+                isBugreport = true,
+                defaultFileName = "bugreport.zip"
             ),
             PredefinedCommand(
                 name = "List SurfaceViews",
@@ -148,11 +156,21 @@ val predefinedCommands = listOf(
     )
 )
 
+// Data class to track file operation status
+data class FileOperationStatus(
+    val isInProgress: Boolean = false,
+    val operationName: String = "",
+    val fileName: String = ""
+)
+
 @Composable
 fun CommandScreen(
     uiState: AdbUiState,
     onExecuteCommand: (String) -> Unit,
     onSaveToFileCommand: (command: String, defaultFileName: String) -> Unit,
+    onBugreport: (defaultFileName: String) -> Unit,
+    isGeneratingBugreport: Boolean,
+    fileOperationStatus: FileOperationStatus = FileOperationStatus(),
     onInstallApk: () -> Unit,
     isInstalling: Boolean,
     onClearHistory: () -> Unit,
@@ -167,13 +185,14 @@ fun CommandScreen(
         CommandBrowserDialog(
             onDismiss = { showCommandBrowser = false },
             onCommandSelected = { cmd ->
-                if (cmd.saveToFile) {
-                    onSaveToFileCommand(cmd.command, cmd.defaultFileName)
-                } else {
-                    onExecuteCommand(cmd.command)
+                when {
+                    cmd.isBugreport -> onBugreport(cmd.defaultFileName)
+                    cmd.saveToFile -> onSaveToFileCommand(cmd.command, cmd.defaultFileName)
+                    else -> onExecuteCommand(cmd.command)
                 }
                 showCommandBrowser = false
-            }
+            },
+            isGeneratingBugreport = isGeneratingBugreport
         )
     }
 
@@ -304,7 +323,17 @@ fun CommandScreen(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (uiState.commandHistory.isEmpty()) {
+            // Show file operation in progress card
+            if (fileOperationStatus.isInProgress) {
+                item {
+                    FileOperationCard(
+                        operationName = fileOperationStatus.operationName,
+                        fileName = fileOperationStatus.fileName
+                    )
+                }
+            }
+
+            if (uiState.commandHistory.isEmpty() && !fileOperationStatus.isInProgress) {
                 item {
                     Box(
                         modifier = Modifier
@@ -375,6 +404,50 @@ fun QuickCommandChip(
         onClick = onClick,
         label = { Text(label, style = MaterialTheme.typography.labelSmall) }
     )
+}
+
+@Composable
+fun FileOperationCard(
+    operationName: String,
+    fileName: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = operationName,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -454,7 +527,8 @@ private fun Int.padZero(): String = if (this < 10) "0$this" else "$this"
 @Composable
 fun CommandBrowserDialog(
     onDismiss: () -> Unit,
-    onCommandSelected: (PredefinedCommand) -> Unit
+    onCommandSelected: (PredefinedCommand) -> Unit,
+    isGeneratingBugreport: Boolean = false
 ) {
     var expandedCategory by remember { mutableStateOf<String?>(predefinedCommands.firstOrNull()?.name) }
 
@@ -509,8 +583,9 @@ fun CommandBrowserDialog(
                                 // Commands list (expanded)
                                 if (expandedCategory == category.name) {
                                     category.commands.forEach { cmd ->
+                                        val isBugreportInProgress = cmd.isBugreport && isGeneratingBugreport
                                         Surface(
-                                            onClick = { onCommandSelected(cmd) },
+                                            onClick = { if (!isBugreportInProgress) onCommandSelected(cmd) },
                                             modifier = Modifier.fillMaxWidth(),
                                             color = MaterialTheme.colorScheme.surface
                                         ) {
@@ -520,13 +595,24 @@ fun CommandBrowserDialog(
                                                     vertical = 8.dp
                                                 )
                                             ) {
-                                                Text(
-                                                    text = cmd.name,
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = cmd.name,
+                                                        style = MaterialTheme.typography.bodyMedium
+                                                    )
+                                                    if (isBugreportInProgress) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp
+                                                        )
+                                                    }
+                                                }
                                                 if (cmd.description.isNotEmpty()) {
                                                     Text(
-                                                        text = cmd.description,
+                                                        text = if (isBugreportInProgress) "Generating bugreport..." else cmd.description,
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )

@@ -421,6 +421,26 @@ class AdbController(
     }
 
     /**
+     * Execute a bugreport command and return the binary zip data.
+     * Bugreport can take several minutes to complete.
+     * @return Result with the zip file bytes or error
+     */
+    suspend fun executeBugreport(): Result<ByteArray> {
+        val connection = currentConnection
+        if (connection == null || !connection.isConnected()) {
+            handleConnectionLost()
+            return Result.failure(Exception("Connection lost. Please reconnect."))
+        }
+
+        return try {
+            PlatformLogger.i(TAG, "Starting bugreport - this may take several minutes...")
+            connection.executeCommandBinary("bugreport")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Install an APK file on the remote device.
      * This pushes the file to the device first, then runs pm install.
      * @param localPath The local path of the APK file

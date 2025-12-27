@@ -164,6 +164,109 @@ class AdbConnection(
         }
     }
 
+    /**
+     * Execute a command and return binary output.
+     * Use this for commands like bugreport that produce binary data.
+     */
+    suspend fun executeCommandBinary(command: String): Result<ByteArray> = withContext(Dispatchers.Default) {
+        if (!connected || socket == null) {
+            return@withContext Result.failure(Exception("Not connected"))
+        }
+
+        try {
+            val currentSocket = socket ?: return@withContext Result.failure(Exception("Socket is null"))
+
+            // Check if there are any lingering messages and drain them
+            while (currentSocket.available() > 0) {
+                val lingering = AdbProtocol.readMessage(currentSocket)
+                PlatformLogger.w(TAG, "Draining lingering message: ${AdbProtocol.commandToString(lingering?.command ?: 0)}")
+            }
+
+            // Open a shell service
+            val destination = "shell:$command\u0000".encodeToByteArray()
+            val currentLocalId = localId++
+
+            PlatformLogger.d(TAG, "Opening binary stream with localId=$currentLocalId for command: $command")
+
+            val openMessage = AdbProtocol.createMessage(
+                AdbProtocol.A_OPEN,
+                currentLocalId,
+                0,
+                destination
+            )
+
+            currentSocket.writeAndFlush(openMessage)
+
+            // Wait for OKAY response
+            val openResponse = AdbProtocol.readMessage(currentSocket)
+
+            PlatformLogger.d(TAG, "Received response to OPEN: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}")
+
+            if (openResponse?.command != AdbProtocol.A_OKAY) {
+                return@withContext Result.failure(Exception(
+                    "Failed to open shell: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}"
+                ))
+            }
+
+            val remoteId = openResponse.arg0
+            val resultChunks = mutableListOf<ByteArray>()
+            var totalSize = 0
+
+            // Read command output as binary
+            while (true) {
+                val message = AdbProtocol.readMessage(currentSocket) ?: break
+
+                when (message.command) {
+                    AdbProtocol.A_WRTE -> {
+                        resultChunks.add(message.data)
+                        totalSize += message.data.size
+
+                        // Log progress for large transfers
+                        if (totalSize % (1024 * 1024) < message.data.size) {
+                            PlatformLogger.d(TAG, "Received ${totalSize / 1024} KB...")
+                        }
+
+                        // Send OKAY to acknowledge
+                        val okayMessage = AdbProtocol.createMessage(
+                            AdbProtocol.A_OKAY,
+                            currentLocalId,
+                            remoteId
+                        )
+                        currentSocket.writeAndFlush(okayMessage)
+                    }
+                    AdbProtocol.A_CLSE -> {
+                        // Stream closed by server, acknowledge it
+                        val closeMessage = AdbProtocol.createMessage(
+                            AdbProtocol.A_CLSE,
+                            currentLocalId,
+                            remoteId
+                        )
+                        currentSocket.writeAndFlush(closeMessage)
+
+                        PlatformLogger.d(TAG, "Stream $currentLocalId closed, total received: $totalSize bytes")
+                        break
+                    }
+                    else -> {
+                        PlatformLogger.w(TAG, "Unexpected message: ${AdbProtocol.commandToString(message.command)}")
+                    }
+                }
+            }
+
+            // Combine all chunks into a single ByteArray
+            val result = ByteArray(totalSize)
+            var offset = 0
+            for (chunk in resultChunks) {
+                chunk.copyInto(result, offset)
+                offset += chunk.size
+            }
+
+            Result.success(result)
+        } catch (e: Exception) {
+            PlatformLogger.e(TAG, "Binary command execution failed", e)
+            Result.failure(e)
+        }
+    }
+
     private suspend fun handleAuthentication(
         socket: PlatformSocket,
         initialAuthResponse: AdbProtocol.AdbMessage

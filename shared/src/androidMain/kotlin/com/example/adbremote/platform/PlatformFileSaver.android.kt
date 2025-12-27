@@ -15,33 +15,51 @@ actual class PlatformFileSaver(private val context: Context) {
         content: String,
         onResult: (path: String?) -> Unit
     ) {
-        withContext(Dispatchers.IO) {
+        val savedPath = withContext(Dispatchers.IO) {
             try {
-                val savedPath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     // Android 10+ (API 29+): Use MediaStore - no permissions needed
-                    saveWithMediaStore(defaultFileName, content)
+                    saveWithMediaStore(defaultFileName, content.toByteArray(), "text/plain")
                 } else {
                     // Android 9 and below: Use legacy approach (requires WRITE_EXTERNAL_STORAGE)
-                    saveWithLegacyStorage(defaultFileName, content)
-                }
-
-                withContext(Dispatchers.Main) {
-                    onResult(savedPath)
+                    saveWithLegacyStorage(defaultFileName, content.toByteArray())
                 }
             } catch (e: Exception) {
                 PlatformLogger.e("PlatformFileSaver", "Failed to save file", e)
-                withContext(Dispatchers.Main) {
-                    onResult(null)
-                }
+                null
             }
         }
+        // Call callback directly - caller handles threading via CompletableDeferred
+        onResult(savedPath)
+    }
+
+    actual suspend fun saveBinaryFile(
+        defaultFileName: String,
+        content: ByteArray,
+        mimeType: String,
+        onResult: (path: String?) -> Unit
+    ) {
+        val savedPath = withContext(Dispatchers.IO) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    saveWithMediaStore(defaultFileName, content, mimeType)
+                } else {
+                    saveWithLegacyStorage(defaultFileName, content)
+                }
+            } catch (e: Exception) {
+                PlatformLogger.e("PlatformFileSaver", "Failed to save binary file", e)
+                null
+            }
+        }
+        // Call callback directly - caller handles threading via CompletableDeferred
+        onResult(savedPath)
     }
 
     /**
      * Save file using MediaStore API (Android 10+)
      * No permissions required for Downloads folder
      */
-    private fun saveWithMediaStore(defaultFileName: String, content: String): String? {
+    private fun saveWithMediaStore(defaultFileName: String, content: ByteArray, mimeType: String): String? {
         val resolver = context.contentResolver
 
         // Generate unique filename if needed
@@ -49,7 +67,7 @@ actual class PlatformFileSaver(private val context: Context) {
 
         val contentValues = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, actualFileName)
-            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+            put(MediaStore.Downloads.MIME_TYPE, mimeType)
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
 
@@ -60,7 +78,7 @@ actual class PlatformFileSaver(private val context: Context) {
         }
 
         resolver.openOutputStream(uri)?.use { outputStream ->
-            outputStream.write(content.toByteArray())
+            outputStream.write(content)
         }
 
         // Mark as complete
@@ -78,7 +96,7 @@ actual class PlatformFileSaver(private val context: Context) {
      * Requires WRITE_EXTERNAL_STORAGE permission
      */
     @Suppress("DEPRECATION")
-    private fun saveWithLegacyStorage(defaultFileName: String, content: String): String? {
+    private fun saveWithLegacyStorage(defaultFileName: String, content: ByteArray): String? {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         if (!downloadsDir.exists()) {
             downloadsDir.mkdirs()
@@ -87,7 +105,7 @@ actual class PlatformFileSaver(private val context: Context) {
         val actualFileName = generateUniqueFileName(defaultFileName)
         val file = File(downloadsDir, actualFileName)
 
-        file.writeText(content)
+        file.writeBytes(content)
         PlatformLogger.i("PlatformFileSaver", "File saved to: ${file.absolutePath}")
         return file.absolutePath
     }
