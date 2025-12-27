@@ -21,7 +21,9 @@ import com.example.adbremote.viewmodel.AdbUiState
 data class PredefinedCommand(
     val name: String,
     val command: String,
-    val description: String = ""
+    val description: String = "",
+    val saveToFile: Boolean = false,
+    val defaultFileName: String = ""
 )
 
 data class CommandCategory(
@@ -64,6 +66,13 @@ val predefinedCommands = listOf(
     CommandCategory(
         name = "Debug",
         commands = listOf(
+            PredefinedCommand(
+                name = "Dump Logcat to File",
+                command = "logcat -d",
+                description = "Save logcat output to a file",
+                saveToFile = true,
+                defaultFileName = "logcat.txt"
+            ),
             PredefinedCommand(
                 name = "List SurfaceViews",
                 command = "dumpsys SurfaceFlinger --list",
@@ -143,6 +152,9 @@ val predefinedCommands = listOf(
 fun CommandScreen(
     uiState: AdbUiState,
     onExecuteCommand: (String) -> Unit,
+    onSaveToFileCommand: (command: String, defaultFileName: String) -> Unit,
+    onInstallApk: () -> Unit,
+    isInstalling: Boolean,
     onClearHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -154,8 +166,12 @@ fun CommandScreen(
     if (showCommandBrowser) {
         CommandBrowserDialog(
             onDismiss = { showCommandBrowser = false },
-            onCommandSelected = { command ->
-                onExecuteCommand(command)
+            onCommandSelected = { cmd ->
+                if (cmd.saveToFile) {
+                    onSaveToFileCommand(cmd.command, cmd.defaultFileName)
+                } else {
+                    onExecuteCommand(cmd.command)
+                }
                 showCommandBrowser = false
             }
         )
@@ -198,6 +214,7 @@ fun CommandScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -212,6 +229,27 @@ fun CommandScreen(
             QuickCommandChip(
                 label = "Top Processes",
                 onClick = { onExecuteCommand("top -n 1") }
+            )
+            // Install APK chip
+            AssistChip(
+                onClick = onInstallApk,
+                enabled = !isInstalling,
+                label = {
+                    if (isInstalling) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text("Installing...", style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else {
+                        Text("Install APK", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             )
         }
 
@@ -416,7 +454,7 @@ private fun Int.padZero(): String = if (this < 10) "0$this" else "$this"
 @Composable
 fun CommandBrowserDialog(
     onDismiss: () -> Unit,
-    onCommandSelected: (String) -> Unit
+    onCommandSelected: (PredefinedCommand) -> Unit
 ) {
     var expandedCategory by remember { mutableStateOf<String?>(predefinedCommands.firstOrNull()?.name) }
 
@@ -472,7 +510,7 @@ fun CommandBrowserDialog(
                                 if (expandedCategory == category.name) {
                                     category.commands.forEach { cmd ->
                                         Surface(
-                                            onClick = { onCommandSelected(cmd.command) },
+                                            onClick = { onCommandSelected(cmd) },
                                             modifier = Modifier.fillMaxWidth(),
                                             color = MaterialTheme.colorScheme.surface
                                         ) {

@@ -11,6 +11,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.example.adbremote.platform.PlatformContext
 import com.example.adbremote.platform.PlatformCrypto
+import com.example.adbremote.platform.PlatformFilePickerFactory
+import com.example.adbremote.platform.PlatformFileSaverFactory
 import com.example.adbremote.platform.PlatformStorageFactory
 import com.example.adbremote.platform.initializePlatform
 import com.example.adbremote.ui.AdbRemoteApp
@@ -40,6 +42,10 @@ fun main() = application {
             AdbController(scope, storage, keyStorage, crypto)
         }
 
+        val platformContext = remember { PlatformContext() }
+        val fileSaver = remember { PlatformFileSaverFactory.create(platformContext) }
+        val filePicker = remember { PlatformFilePickerFactory.create(platformContext) }
+
         DisposableEffect(Unit) {
             onDispose {
                 controller.cleanup()
@@ -51,7 +57,7 @@ fun main() = application {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                AdbRemoteApp(controller = controller)
+                AdbRemoteApp(controller = controller, fileSaver = fileSaver, filePicker = filePicker)
             }
         }
     }

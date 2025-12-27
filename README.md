@@ -197,6 +197,8 @@ The app includes several quick command shortcuts:
 - **Device Info**: Shows all device properties (`getprop`)
 - **List Apps**: Lists all installed packages (`pm list packages`)
 - **Top Processes**: Shows running processes (`top -n 1`)
+- **Install APK**: Pick an APK file from your device and install it on the remote Android device
+- **Dump Logcat to File**: Save logcat output to a file (found in Command Browser > Debug)
 
 ## Building the Project
 
@@ -223,10 +225,39 @@ The app includes several quick command shortcuts:
 
 ### iOS
 
-Open `iosApp/iosApp.xcodeproj` in Xcode and build from there, or use:
+#### Option 1: Using Xcode (Recommended)
 
 ```bash
-./gradlew :composeApp:iosDeployIPhone14Debug  # Deploy to simulator
+open iosApp/iosApp.xcodeproj
+```
+Then select an iPhone simulator and click Run (▶️).
+
+#### Option 2: Command Line
+
+```bash
+# 1. Build the Kotlin framework for iOS Simulator
+./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
+
+# 2. Build the Xcode project
+cd iosApp && xcodebuild -project iosApp.xcodeproj -scheme iosApp \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -derivedDataPath build build
+
+# 3. Install on booted simulator
+xcrun simctl install booted iosApp/build/Build/Products/Debug-iphonesimulator/iosApp.app
+
+# 4. Launch the app
+xcrun simctl launch booted com.example.adbremote
+```
+
+**Quick rebuild after code changes:**
+```bash
+./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 && \
+cd iosApp && xcodebuild -project iosApp.xcodeproj -scheme iosApp \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -derivedDataPath build build && \
+xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/iosApp.app && \
+xcrun simctl launch booted com.example.adbremote
 ```
 
 ### Other Commands
@@ -298,6 +329,8 @@ The app uses Kotlin's `expect`/`actual` mechanism for platform-specific code:
 - `PlatformStorage` - Preferences and file storage
 - `PlatformLogger` - Logging facade
 - `NetworkScanner` - Local network device discovery
+- `PlatformFileSaver` - Save files to device storage (Downloads on Android, Documents on iOS)
+- `PlatformFilePicker` - Native file picker (SAF on Android, UIDocumentPicker on iOS, AWT FileDialog on Desktop)
 
 ## Troubleshooting
 

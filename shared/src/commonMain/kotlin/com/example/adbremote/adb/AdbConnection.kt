@@ -1,5 +1,6 @@
 package com.example.adbremote.adb
 
+import com.example.adbremote.model.currentTimeMillis
 import com.example.adbremote.platform.PlatformLogger
 import com.example.adbremote.platform.PlatformSocket
 import kotlinx.coroutines.Dispatchers
@@ -256,6 +257,193 @@ class AdbConnection(
         } catch (e: Exception) {
             PlatformLogger.e(TAG, "Authentication failed", e)
             return@withContext Result.failure(e)
+        }
+    }
+
+    /**
+     * Push a file to the remote device using ADB sync protocol.
+     * @param fileBytes The content of the file to push
+     * @param remotePath The destination path on the remote device
+     * @param mode File permissions (default 0644)
+     * @return Result with success or failure message
+     */
+    suspend fun pushFile(fileBytes: ByteArray, remotePath: String, mode: Int = 0x1A4): Result<Unit> = withContext(Dispatchers.Default) {
+        if (!connected || socket == null) {
+            return@withContext Result.failure(Exception("Not connected"))
+        }
+
+        try {
+            val currentSocket = socket ?: return@withContext Result.failure(Exception("Socket is null"))
+
+            // Drain any lingering messages
+            while (currentSocket.available() > 0) {
+                val lingering = AdbProtocol.readMessage(currentSocket)
+                PlatformLogger.w(TAG, "Draining lingering message: ${AdbProtocol.commandToString(lingering?.command ?: 0)}")
+            }
+
+            // Open sync service
+            val destination = "sync:\u0000".encodeToByteArray()
+            val currentLocalId = localId++
+
+            PlatformLogger.d(TAG, "Opening sync stream with localId=$currentLocalId")
+
+            val openMessage = AdbProtocol.createMessage(
+                AdbProtocol.A_OPEN,
+                currentLocalId,
+                0,
+                destination
+            )
+
+            currentSocket.writeAndFlush(openMessage)
+
+            // Wait for OKAY response
+            val openResponse = AdbProtocol.readMessage(currentSocket)
+
+            if (openResponse?.command != AdbProtocol.A_OKAY) {
+                return@withContext Result.failure(Exception(
+                    "Failed to open sync: ${AdbProtocol.commandToString(openResponse?.command ?: 0)}"
+                ))
+            }
+
+            val remoteId = openResponse.arg0
+            PlatformLogger.d(TAG, "Sync stream opened, remoteId=$remoteId")
+
+            // Build all sync protocol data into a single buffer
+            // Format: SEND header + DATA chunks + DONE
+            val pathWithMode = "$remotePath,$mode"
+            val pathBytes = pathWithMode.encodeToByteArray()
+
+            // Calculate total size needed
+            val sendHeaderSize = 8 + pathBytes.size
+            val dataHeadersSize = 8 * ((fileBytes.size + 65535) / 65536) // One 8-byte header per 64KB chunk
+            val doneSize = 8
+            val totalSyncSize = sendHeaderSize + dataHeadersSize + fileBytes.size + doneSize
+
+            PlatformLogger.d(TAG, "Building sync data: ${fileBytes.size} bytes file, total sync size: $totalSyncSize")
+
+            // Build the sync data
+            val syncData = ByteArray(totalSyncSize)
+            var pos = 0
+
+            // SEND command
+            syncData[pos++] = 'S'.code.toByte()
+            syncData[pos++] = 'E'.code.toByte()
+            syncData[pos++] = 'N'.code.toByte()
+            syncData[pos++] = 'D'.code.toByte()
+            syncData[pos++] = (pathBytes.size and 0xFF).toByte()
+            syncData[pos++] = ((pathBytes.size shr 8) and 0xFF).toByte()
+            syncData[pos++] = ((pathBytes.size shr 16) and 0xFF).toByte()
+            syncData[pos++] = ((pathBytes.size shr 24) and 0xFF).toByte()
+            pathBytes.copyInto(syncData, pos)
+            pos += pathBytes.size
+
+            // DATA chunks (max 64KB each per sync protocol)
+            val syncChunkSize = 65536
+            var fileOffset = 0
+            while (fileOffset < fileBytes.size) {
+                val remaining = fileBytes.size - fileOffset
+                val thisChunk = minOf(remaining, syncChunkSize)
+
+                syncData[pos++] = 'D'.code.toByte()
+                syncData[pos++] = 'A'.code.toByte()
+                syncData[pos++] = 'T'.code.toByte()
+                syncData[pos++] = 'A'.code.toByte()
+                syncData[pos++] = (thisChunk and 0xFF).toByte()
+                syncData[pos++] = ((thisChunk shr 8) and 0xFF).toByte()
+                syncData[pos++] = ((thisChunk shr 16) and 0xFF).toByte()
+                syncData[pos++] = ((thisChunk shr 24) and 0xFF).toByte()
+                fileBytes.copyInto(syncData, pos, fileOffset, fileOffset + thisChunk)
+                pos += thisChunk
+                fileOffset += thisChunk
+            }
+
+            // DONE command
+            val mtime = (currentTimeMillis() / 1000).toInt()
+            syncData[pos++] = 'D'.code.toByte()
+            syncData[pos++] = 'O'.code.toByte()
+            syncData[pos++] = 'N'.code.toByte()
+            syncData[pos++] = 'E'.code.toByte()
+            syncData[pos++] = (mtime and 0xFF).toByte()
+            syncData[pos++] = ((mtime shr 8) and 0xFF).toByte()
+            syncData[pos++] = ((mtime shr 16) and 0xFF).toByte()
+            syncData[pos++] = ((mtime shr 24) and 0xFF).toByte()
+
+            PlatformLogger.d(TAG, "Sync data built, sending in ADB WRTE chunks...")
+
+            // Now send the sync data in ADB WRTE messages (respecting MAX_PAYLOAD)
+            var syncOffset = 0
+            while (syncOffset < syncData.size) {
+                val remaining = syncData.size - syncOffset
+                val thisChunk = minOf(remaining, AdbProtocol.MAX_PAYLOAD)
+                val chunk = syncData.copyOfRange(syncOffset, syncOffset + thisChunk)
+
+                val wrte = AdbProtocol.createMessage(AdbProtocol.A_WRTE, currentLocalId, remoteId, chunk)
+                currentSocket.writeAndFlush(wrte)
+
+                // Wait for OKAY acknowledgment before sending next chunk
+                val resp = AdbProtocol.readMessage(currentSocket)
+                if (resp?.command != AdbProtocol.A_OKAY) {
+                    return@withContext Result.failure(Exception(
+                        "Expected OKAY after WRTE, got ${AdbProtocol.commandToString(resp?.command ?: 0)}"
+                    ))
+                }
+
+                syncOffset += thisChunk
+                if (syncOffset % (1024 * 1024) < AdbProtocol.MAX_PAYLOAD || syncOffset == syncData.size) {
+                    PlatformLogger.d(TAG, "Sent ${syncOffset}/${syncData.size} bytes")
+                }
+            }
+
+            PlatformLogger.d(TAG, "All sync data sent, waiting for response...")
+
+            // Now read the sync response (WRTE with OKAY or FAIL)
+            var response = AdbProtocol.readMessage(currentSocket)
+            PlatformLogger.d(TAG, "Got response: ${AdbProtocol.commandToString(response?.command ?: 0)}")
+
+            if (response?.command == AdbProtocol.A_WRTE) {
+                val respData = response.data
+                if (respData.size >= 4) {
+                    val syncResp = respData.sliceArray(0..3).decodeToString()
+                    PlatformLogger.d(TAG, "Sync response: $syncResp")
+
+                    // Acknowledge the WRTE
+                    val okayMsg = AdbProtocol.createMessage(AdbProtocol.A_OKAY, currentLocalId, remoteId)
+                    currentSocket.writeAndFlush(okayMsg)
+
+                    if (syncResp == "OKAY") {
+                        PlatformLogger.i(TAG, "File pushed successfully to $remotePath")
+                    } else if (syncResp == "FAIL") {
+                        val errorLen = if (respData.size >= 8) {
+                            (respData[4].toInt() and 0xFF) or
+                            ((respData[5].toInt() and 0xFF) shl 8) or
+                            ((respData[6].toInt() and 0xFF) shl 16) or
+                            ((respData[7].toInt() and 0xFF) shl 24)
+                        } else 0
+                        val errorMsg = if (respData.size > 8) {
+                            respData.sliceArray(8 until minOf(8 + errorLen, respData.size)).decodeToString()
+                        } else "Unknown error"
+                        return@withContext Result.failure(Exception("Push failed: $errorMsg"))
+                    }
+                }
+            } else if (response?.command == AdbProtocol.A_CLSE) {
+                return@withContext Result.failure(Exception("Stream closed unexpectedly"))
+            } else {
+                return@withContext Result.failure(Exception(
+                    "Unexpected response: ${AdbProtocol.commandToString(response?.command ?: 0)}"
+                ))
+            }
+
+            // Close the sync stream
+            val closeMessage = AdbProtocol.createMessage(AdbProtocol.A_CLSE, currentLocalId, remoteId)
+            currentSocket.writeAndFlush(closeMessage)
+
+            // Read close acknowledgment (ignore)
+            AdbProtocol.readMessage(currentSocket)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            PlatformLogger.e(TAG, "Push file failed", e)
+            Result.failure(e)
         }
     }
 

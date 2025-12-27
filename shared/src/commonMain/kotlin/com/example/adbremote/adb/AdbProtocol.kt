@@ -28,6 +28,16 @@ object AdbProtocol {
     const val ADB_AUTH_SIGNATURE = 2
     const val ADB_AUTH_RSAPUBLICKEY = 3
 
+    // ADB Sync Protocol Commands (as integers from ASCII)
+    const val SYNC_SEND = 0x444E4553  // "SEND" in little-endian
+    const val SYNC_DATA = 0x41544144  // "DATA" in little-endian
+    const val SYNC_DONE = 0x454E4F44  // "DONE" in little-endian
+    const val SYNC_OKAY = 0x59414B4F  // "OKAY" in little-endian
+    const val SYNC_FAIL = 0x4C494146  // "FAIL" in little-endian
+
+    // Max sync data chunk size
+    const val SYNC_DATA_MAX = 65536
+
     data class AdbMessage(
         val command: Int,
         val arg0: Int,

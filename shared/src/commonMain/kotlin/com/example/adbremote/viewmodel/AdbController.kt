@@ -336,6 +336,29 @@ class AdbController(
         _uiState.update { it.copy(commandHistory = emptyList()) }
     }
 
+    /**
+     * Execute a command and return the result directly (for save-to-file scenarios).
+     * Does not add to command history.
+     */
+    suspend fun executeCommandWithResult(command: String): Result<String> {
+        val sanitizedCommand = command.trim()
+            .removePrefix("adb shell ")
+            .removePrefix("adb shell")
+            .trim()
+
+        val connection = currentConnection
+        if (connection == null || !connection.isConnected()) {
+            handleConnectionLost()
+            return Result.failure(Exception("Connection lost. Please reconnect."))
+        }
+
+        return try {
+            connection.executeCommand(sanitizedCommand)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun cleanup() {
         disconnect()
         stopScan()
@@ -395,5 +418,62 @@ class AdbController(
      */
     fun clearDiscoveredDevices() {
         _uiState.update { it.copy(discoveredDevices = emptyList()) }
+    }
+
+    /**
+     * Install an APK file on the remote device.
+     * This pushes the file to the device first, then runs pm install.
+     * @param localPath The local path of the APK file
+     * @return Result with success message or error
+     */
+    suspend fun installApk(localPath: String): Result<String> {
+        val connection = currentConnection
+        if (connection == null || !connection.isConnected()) {
+            handleConnectionLost()
+            return Result.failure(Exception("Connection lost. Please reconnect."))
+        }
+
+        // Read the file bytes
+        val fileBytes = com.example.adbremote.platform.readFileBytes(localPath)
+        if (fileBytes == null) {
+            return Result.failure(Exception("Failed to read APK file"))
+        }
+
+        PlatformLogger.i(TAG, "Installing APK: ${fileBytes.size} bytes")
+
+        // Generate remote path for the APK
+        val fileName = localPath.substringAfterLast('/').substringAfterLast('\\')
+        val remotePath = "/data/local/tmp/$fileName"
+
+        // Push the file to the device
+        val pushResult = connection.pushFile(fileBytes, remotePath)
+        if (pushResult.isFailure) {
+            return Result.failure(Exception("Failed to push APK: ${pushResult.exceptionOrNull()?.message}"))
+        }
+
+        PlatformLogger.i(TAG, "APK pushed to $remotePath, running pm install...")
+
+        // Run pm install with -r (replace) and -t (allow test APKs)
+        val installResult = connection.executeCommand("pm install -r -t \"$remotePath\"")
+
+        // Clean up the remote file regardless of install result
+        try {
+            connection.executeCommand("rm \"$remotePath\"")
+        } catch (e: Exception) {
+            PlatformLogger.w(TAG, "Failed to clean up remote APK: ${e.message}")
+        }
+
+        return installResult.fold(
+            onSuccess = { output ->
+                if (output.contains("Success")) {
+                    Result.success("APK installed successfully")
+                } else {
+                    Result.failure(Exception("Install failed: $output"))
+                }
+            },
+            onFailure = { error ->
+                Result.failure(Exception("Install failed: ${error.message}"))
+            }
+        )
     }
 }
