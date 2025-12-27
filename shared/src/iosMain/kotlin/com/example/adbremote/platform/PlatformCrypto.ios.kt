@@ -168,18 +168,83 @@ actual class PlatformCrypto actual constructor() {
     }
 
     actual fun sha1(data: ByteArray): ByteArray {
-        val nsData = data.toNSData()
-        val hash = NSMutableData.dataWithLength(20u)!! // CC_SHA1_DIGEST_LENGTH
+        // Pure Kotlin SHA1 implementation for iOS
+        return sha1Pure(data)
+    }
 
-        // Use CommonCrypto via NSData
-        data.usePinned { pinned ->
-            hash.mutableBytes?.let { hashPtr ->
-                CC_SHA1(pinned.addressOf(0), data.size.toUInt(), hashPtr.reinterpret())
-            }
+    // Pure Kotlin SHA1 implementation
+    private fun sha1Pure(data: ByteArray): ByteArray {
+        val h = intArrayOf(
+            0x67452301,
+            0xEFCDAB89.toInt(),
+            0x98BADCFE.toInt(),
+            0x10325476,
+            0xC3D2E1F0.toInt()
+        )
+
+        val ml = data.size.toLong() * 8
+        val paddedLength = ((data.size + 9 + 63) / 64) * 64
+        val padded = ByteArray(paddedLength)
+        data.copyInto(padded)
+        padded[data.size] = 0x80.toByte()
+
+        // Append length in big-endian
+        for (i in 0..7) {
+            padded[paddedLength - 8 + i] = ((ml shr (56 - i * 8)) and 0xFF).toByte()
         }
 
-        return hash.toByteArray()
+        val w = IntArray(80)
+        for (chunk in 0 until paddedLength / 64) {
+            val offset = chunk * 64
+            for (i in 0..15) {
+                w[i] = ((padded[offset + i * 4].toInt() and 0xFF) shl 24) or
+                        ((padded[offset + i * 4 + 1].toInt() and 0xFF) shl 16) or
+                        ((padded[offset + i * 4 + 2].toInt() and 0xFF) shl 8) or
+                        (padded[offset + i * 4 + 3].toInt() and 0xFF)
+            }
+            for (i in 16..79) {
+                w[i] = (w[i - 3] xor w[i - 8] xor w[i - 14] xor w[i - 16]).rotateLeft(1)
+            }
+
+            var a = h[0]
+            var b = h[1]
+            var c = h[2]
+            var d = h[3]
+            var e = h[4]
+
+            for (i in 0..79) {
+                val (f, k) = when (i) {
+                    in 0..19 -> ((b and c) or (b.inv() and d)) to 0x5A827999
+                    in 20..39 -> (b xor c xor d) to 0x6ED9EBA1
+                    in 40..59 -> ((b and c) or (b and d) or (c and d)) to 0x8F1BBCDC.toInt()
+                    else -> (b xor c xor d) to 0xCA62C1D6.toInt()
+                }
+                val temp = a.rotateLeft(5) + f + e + k + w[i]
+                e = d
+                d = c
+                c = b.rotateLeft(30)
+                b = a
+                a = temp
+            }
+
+            h[0] += a
+            h[1] += b
+            h[2] += c
+            h[3] += d
+            h[4] += e
+        }
+
+        val result = ByteArray(20)
+        for (i in 0..4) {
+            result[i * 4] = (h[i] shr 24).toByte()
+            result[i * 4 + 1] = (h[i] shr 16).toByte()
+            result[i * 4 + 2] = (h[i] shr 8).toByte()
+            result[i * 4 + 3] = h[i].toByte()
+        }
+        return result
     }
+
+    private fun Int.rotateLeft(bits: Int): Int = (this shl bits) or (this ushr (32 - bits))
 
     private fun parseRsaPublicKeyModulus(data: ByteArray): ByteArray {
         // Simple ASN.1 DER parser for PKCS#1 RSAPublicKey
@@ -295,7 +360,3 @@ private fun NSData.toByteArray(): ByteArray {
     }
     return bytes
 }
-
-// CommonCrypto SHA1 declaration
-@OptIn(ExperimentalForeignApi::class)
-private external fun CC_SHA1(data: CPointer<ByteVar>?, len: UInt, md: CPointer<ByteVar>?): CPointer<ByteVar>?

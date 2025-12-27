@@ -407,8 +407,11 @@ private fun formatTimestamp(timestamp: Long): String {
     val seconds = (timestamp / 1000) % 60
     val minutes = (timestamp / 60000) % 60
     val hours = (timestamp / 3600000) % 24
-    return "%02d:%02d:%02d".format(hours.toInt(), minutes.toInt(), seconds.toInt())
+    return "${hours.toInt().padZero()}:${minutes.toInt().padZero()}:${seconds.toInt().padZero()}"
 }
+
+// Pad single digit numbers with leading zero
+private fun Int.padZero(): String = if (this < 10) "0$this" else "$this"
 
 @Composable
 fun CommandBrowserDialog(

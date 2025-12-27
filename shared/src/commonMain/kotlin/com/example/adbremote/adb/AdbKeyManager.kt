@@ -48,7 +48,7 @@ class AdbKeyManager(
         return try {
             val encoded = keyPair?.getPublicKeyEncoded() ?: return "error"
             val digest = crypto.sha1(encoded)
-            digest.take(16).joinToString(":") { "%02x".format(it) }
+            digest.take(16).joinToString(":") { it.toHexString() }
         } catch (e: Exception) {
             "error"
         }
@@ -65,12 +65,12 @@ class AdbKeyManager(
             }
 
             PlatformLogger.i(TAG, "Signing token (${token.size} bytes)")
-            PlatformLogger.i(TAG, "Token: ${token.joinToString("") { "%02x".format(it) }}")
+            PlatformLogger.i(TAG, "Token: ${token.joinToString("") { it.toHexString() }}")
 
             val signed = crypto.signWithSha1DigestInfo(token, kp.privateKey)
 
             PlatformLogger.i(TAG, "Generated signature: ${signed.size} bytes")
-            PlatformLogger.i(TAG, "Signature: ${signed.take(16).joinToString("") { "%02x".format(it) }}...")
+            PlatformLogger.i(TAG, "Signature: ${signed.take(16).joinToString("") { it.toHexString() }}...")
 
             signed
         } catch (e: Exception) {
@@ -176,6 +176,13 @@ data class MontgomeryData(
  * This is platform-agnostic - uses simple arithmetic.
  */
 expect fun calculateMontgomeryConstants(modulusBytes: ByteArray, len: Int): MontgomeryData
+
+// Hex string formatting for Kotlin Multiplatform (no String.format)
+private fun Byte.toHexString(): String {
+    val hex = "0123456789abcdef"
+    val i = this.toInt() and 0xFF
+    return "${hex[i shr 4]}${hex[i and 0x0F]}"
+}
 
 // Base64 encoding without external dependencies
 private fun ByteArray.encodeBase64(): String {

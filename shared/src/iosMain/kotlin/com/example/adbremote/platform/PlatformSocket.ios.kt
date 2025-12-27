@@ -21,12 +21,12 @@ actual class PlatformSocket actual constructor() {
 
             // Set up address
             val serverAddr = alloc<sockaddr_in>()
-            serverAddr.sin_family = AF_INET.convert()
-            serverAddr.sin_port = htons(port.toUShort())
+            serverAddr.sin_family = AF_INET.toUByte()
+            serverAddr.sin_port = swapBytes(port.toUShort())
 
-            // Convert host to address
-            val hostAddr = inet_addr(host)
-            if (hostAddr == INADDR_NONE) {
+            // Convert host to address using inet_pton
+            val result = inet_pton(AF_INET, host, serverAddr.sin_addr.ptr)
+            if (result != 1) {
                 // Try to resolve hostname
                 val hostent = gethostbyname(host)
                 if (hostent == null) {
@@ -40,9 +40,7 @@ actual class PlatformSocket actual constructor() {
                     socketFd = -1
                     throw Exception("No addresses found for host: $host")
                 }
-                serverAddr.sin_addr.s_addr = addrList[0]!!.reinterpret<in_addrVar>().pointed.s_addr
-            } else {
-                serverAddr.sin_addr.s_addr = hostAddr
+                memcpy(serverAddr.sin_addr.ptr, addrList[0], sizeOf<in_addr>().toULong())
             }
 
             // Set socket to non-blocking for timeout support
@@ -50,7 +48,7 @@ actual class PlatformSocket actual constructor() {
             fcntl(socketFd, F_SETFL, flags or O_NONBLOCK)
 
             // Connect
-            val connectResult = connect(socketFd, serverAddr.ptr.reinterpret(), sizeOf<sockaddr_in>().convert())
+            val connectResult = connect(socketFd, serverAddr.ptr.reinterpret(), sizeOf<sockaddr_in>().toUInt())
 
             if (connectResult < 0 && errno != EINPROGRESS) {
                 close(socketFd)
@@ -64,8 +62,8 @@ actual class PlatformSocket actual constructor() {
             posix_FD_SET(socketFd, fdSet.ptr)
 
             val timeout = alloc<timeval>()
-            timeout.tv_sec = (timeoutMs / 1000).convert()
-            timeout.tv_usec = ((timeoutMs % 1000) * 1000).convert()
+            timeout.tv_sec = (timeoutMs / 1000).toLong()
+            timeout.tv_usec = ((timeoutMs % 1000) * 1000)
 
             val selectResult = select(socketFd + 1, null, fdSet.ptr, null, timeout.ptr)
 
@@ -77,8 +75,8 @@ actual class PlatformSocket actual constructor() {
 
             // Check for errors
             val error = alloc<IntVar>()
-            val len = alloc<socklen_tVar>()
-            len.value = sizeOf<IntVar>().convert()
+            val len = alloc<UIntVar>()
+            len.value = sizeOf<IntVar>().toUInt()
             getsockopt(socketFd, SOL_SOCKET, SO_ERROR, error.ptr, len.ptr)
 
             if (error.value != 0) {
@@ -90,6 +88,11 @@ actual class PlatformSocket actual constructor() {
             // Set socket back to blocking
             fcntl(socketFd, F_SETFL, flags)
         }
+    }
+
+    // Network byte order conversion (big-endian)
+    private fun swapBytes(value: UShort): UShort {
+        return (((value.toInt() and 0xFF) shl 8) or ((value.toInt() shr 8) and 0xFF)).toUShort()
     }
 
     actual fun read(buffer: ByteArray, offset: Int, length: Int): Int {
@@ -148,8 +151,8 @@ actual class PlatformSocket actual constructor() {
 
         // Check if socket is still alive by peeking
         memScoped {
-            val buffer = allocArray<ByteVar>(1)
-            val result = recv(socketFd, buffer, 1, MSG_PEEK or MSG_DONTWAIT)
+            val buffer = alloc<platform.posix.int8_tVar>()
+            val result = recv(socketFd, buffer.ptr, 1u, MSG_PEEK or MSG_DONTWAIT)
             // If result is 0, connection was closed
             // If result is -1 with EAGAIN/EWOULDBLOCK, connection is alive but no data
             // If result is > 0, connection is alive

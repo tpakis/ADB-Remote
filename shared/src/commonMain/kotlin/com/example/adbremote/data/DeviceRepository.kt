@@ -26,7 +26,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Save the list of devices to persistent storage
      */
-    suspend fun saveDevices(devices: List<AdbDevice>) = withContext(Dispatchers.IO) {
+    suspend fun saveDevices(devices: List<AdbDevice>) = withContext(Dispatchers.Default) {
         try {
             // Only save non-connection state
             val devicesToSave = devices.map { it.copy(isConnected = false) }
@@ -41,7 +41,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Load the list of devices from persistent storage
      */
-    suspend fun loadDevices(): List<AdbDevice> = withContext(Dispatchers.IO) {
+    suspend fun loadDevices(): List<AdbDevice> = withContext(Dispatchers.Default) {
         val devicesJson = storage.getString(KEY_DEVICES)
         if (devicesJson == null) {
             PlatformLogger.d(TAG, "No saved devices found")
@@ -61,7 +61,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Save the last connected device for quick reconnection
      */
-    suspend fun saveLastConnectedDevice(device: AdbDevice) = withContext(Dispatchers.IO) {
+    suspend fun saveLastConnectedDevice(device: AdbDevice) = withContext(Dispatchers.Default) {
         storage.saveString(KEY_LAST_DEVICE_HOST, device.host)
         storage.saveString(KEY_LAST_DEVICE_PORT, device.port.toString())
     }
@@ -69,7 +69,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Get the last connected device info (host and port)
      */
-    suspend fun getLastConnectedDevice(): Pair<String, Int>? = withContext(Dispatchers.IO) {
+    suspend fun getLastConnectedDevice(): Pair<String, Int>? = withContext(Dispatchers.Default) {
         val host = storage.getString(KEY_LAST_DEVICE_HOST)
         val portStr = storage.getString(KEY_LAST_DEVICE_PORT)
         val port = portStr?.toIntOrNull()
@@ -84,7 +84,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Save a successful command to recent commands list
      */
-    suspend fun addRecentCommand(command: String) = withContext(Dispatchers.IO) {
+    suspend fun addRecentCommand(command: String) = withContext(Dispatchers.Default) {
         try {
             val recentCommands = loadRecentCommands().toMutableList()
 
@@ -108,7 +108,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Load recent commands list
      */
-    suspend fun loadRecentCommands(): List<String> = withContext(Dispatchers.IO) {
+    suspend fun loadRecentCommands(): List<String> = withContext(Dispatchers.Default) {
         val commandsJson = storage.getString(KEY_RECENT_COMMANDS) ?: return@withContext emptyList()
 
         try {
@@ -122,7 +122,7 @@ class DeviceRepository(private val storage: PlatformStorage) {
     /**
      * Clear all saved data
      */
-    suspend fun clearAll() = withContext(Dispatchers.IO) {
+    suspend fun clearAll() = withContext(Dispatchers.Default) {
         storage.clear()
     }
 }
