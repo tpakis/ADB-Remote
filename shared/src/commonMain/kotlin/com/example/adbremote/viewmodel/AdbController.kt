@@ -34,6 +34,7 @@ class AdbController(
     val uiState: StateFlow<AdbUiState> = _uiState.asStateFlow()
 
     private var currentConnection: AdbConnection? = null
+    private var connectionJob: Job? = null
     private val keyManager: AdbKeyManager
     private val deviceRepository: DeviceRepository
     private val networkScanner = NetworkScanner()
@@ -152,11 +153,14 @@ class AdbController(
     fun connect() {
         val device = _uiState.value.selectedDevice ?: return
 
-        scope.launch {
+        // Cancel any existing connection attempt
+        connectionJob?.cancel()
+
+        connectionJob = scope.launch {
             _uiState.update { it.copy(isConnecting = true, errorMessage = null) }
 
+            val connection = AdbConnection(device.host, device.port, keyManager)
             try {
-                val connection = AdbConnection(device.host, device.port, keyManager)
                 val result = connection.connect()
 
                 result.fold(
@@ -182,6 +186,7 @@ class AdbController(
                         PlatformLogger.d(TAG, "Connected to ${device.name}")
                     },
                     onFailure = { error ->
+                        connection.disconnect()
                         _uiState.update { currentState ->
                             currentState.copy(
                                 isConnecting = false,
@@ -191,11 +196,26 @@ class AdbController(
                         PlatformLogger.e(TAG, "Connection failed", error)
                     }
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Connection was cancelled by user
+                connection.disconnect()
+                PlatformLogger.d(TAG, "Connection cancelled by user")
+                throw e
             } catch (e: Exception) {
+                connection.disconnect()
                 _uiState.update { it.copy(isConnecting = false, errorMessage = e.message) }
                 PlatformLogger.e(TAG, "Connection error", e)
             }
         }
+    }
+
+    fun cancelConnection() {
+        connectionJob?.cancel()
+        connectionJob = null
+        currentConnection?.disconnect()
+        currentConnection = null
+        _uiState.update { it.copy(isConnecting = false) }
+        PlatformLogger.d(TAG, "Connection attempt cancelled")
     }
 
     fun disconnect() {

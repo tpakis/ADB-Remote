@@ -64,6 +64,7 @@ fun AdbRemoteApp(
                     onSelectDevice = controller::selectDevice,
                     onConnect = controller::connect,
                     onDisconnect = controller::disconnect,
+                    onCancelConnection = controller::cancelConnection,
                     onClearError = controller::clearError,
                     onStartScan = controller::startScan,
                     onStopScan = controller::stopScan,

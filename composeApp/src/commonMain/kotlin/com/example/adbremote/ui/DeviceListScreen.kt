@@ -23,6 +23,7 @@ fun DeviceListScreen(
     onSelectDevice: (AdbDevice) -> Unit,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
+    onCancelConnection: () -> Unit,
     onClearError: () -> Unit,
     onStartScan: () -> Unit = {},
     onStopScan: () -> Unit = {},
@@ -97,7 +98,14 @@ fun DeviceListScreen(
                         }
 
                         if (uiState.isConnecting) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            OutlinedButton(onClick = onCancelConnection) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Cancel")
+                            }
                         } else if (device.isConnected) {
                             Button(onClick = onDisconnect) {
                                 Text("Disconnect")
