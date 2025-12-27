@@ -127,15 +127,14 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "ADB Remote"
             packageVersion = "1.0.0"
+            description = "ADB Remote Control - Send ADB commands to Android devices over TCP/IP"
+            vendor = "ADB Remote"
 
             macOS {
-                iconFile.set(project.file("icons/icon.icns"))
-            }
-            windows {
-                iconFile.set(project.file("icons/icon.ico"))
+                bundleID = "com.example.adbremote"
             }
             linux {
-                iconFile.set(project.file("icons/icon.png"))
+                packageName = "adb-remote"
             }
         }
     }

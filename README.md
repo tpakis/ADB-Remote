@@ -46,6 +46,85 @@ TV remote control interface for Android TV devices:
 - Dark/Light theme support
 - Bottom navigation (Devices / Commands / RCU)
 
+## Installation
+
+### Android
+
+1. Download the latest `ADB Remote-x.x.x.apk` from the [Releases](https://github.com/user/android-adb/releases) page
+2. Transfer the APK to your Android device
+3. Enable **"Install from unknown sources"** in your device settings if prompted
+4. Open the APK file to install
+5. Grant network permissions when requested
+
+### macOS
+
+#### Option 1: DMG Installer (Recommended)
+
+1. Download the latest `ADB Remote-x.x.x.dmg` from the [Releases](https://github.com/user/android-adb/releases) page
+2. Open the DMG file
+3. Drag "ADB Remote" to your Applications folder
+4. **Important**: Since the app is not signed with an Apple Developer certificate, you need to allow it to run:
+   - Try to open the app - you'll see a security warning
+   - Go to **System Settings > Privacy & Security**
+   - Scroll down to find the message about "ADB Remote" being blocked
+   - Click **"Open Anyway"**
+   - Alternatively, right-click (or Control+click) on the app and select **"Open"** from the context menu
+
+#### Option 2: JAR File (Requires Java 17+)
+
+1. Download `ADB Remote-macos-arm64-x.x.x-release.jar` (Apple Silicon) or build from source for Intel
+2. Run with: `java -jar "ADB Remote-macos-arm64-1.0.0-release.jar"`
+
+### Linux
+
+#### Option 1: DEB Package (Debian/Ubuntu)
+
+Build the DEB package on a Linux machine:
+```bash
+./gradlew :composeApp:packageReleaseDeb
+```
+The package will be at `composeApp/build/compose/binaries/main-release/deb/`
+
+Install:
+```bash
+sudo dpkg -i adb-remote_1.0.0-1_amd64.deb
+```
+
+#### Option 2: JAR File (Requires Java 17+)
+
+1. Build the JAR on Linux: `./gradlew :composeApp:packageReleaseUberJarForCurrentOS`
+2. Run with: `java -jar "ADB Remote-linux-x64-1.0.0-release.jar"`
+
+### Windows
+
+#### Option 1: MSI Installer
+
+Build on a Windows machine:
+```bash
+./gradlew :composeApp:packageReleaseMsi
+```
+
+#### Option 2: JAR File (Requires Java 17+)
+
+1. Build the JAR on Windows: `./gradlew :composeApp:packageReleaseUberJarForCurrentOS`
+2. Run with: `java -jar "ADB Remote-windows-x64-1.0.0-release.jar"`
+
+Or double-click the JAR file if Java is properly associated with `.jar` files.
+
+### Building from Source
+
+For all platforms, you can build and run directly:
+```bash
+# Run the desktop app
+./gradlew :composeApp:run
+
+# Build release packages for current OS
+./gradlew :composeApp:packageReleaseDistributionForCurrentOS
+
+# Build cross-platform JAR
+./gradlew :composeApp:packageReleaseUberJarForCurrentOS
+```
+
 ## Requirements
 
 - Target device must have ADB over TCP/IP enabled

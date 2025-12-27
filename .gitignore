@@ -29,5 +29,8 @@ app/build/
 .kotlin/metadata/kotlinTransformedCInteropMetadataLibraries/
 
 *.salive
+
+# Local release artifacts (built by CI/CD)
+/releases/
 CLAUDE.md
 .claude/
