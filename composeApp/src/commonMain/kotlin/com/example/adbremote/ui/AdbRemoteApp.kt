@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.example.adbremote.platform.PlatformClipboard
 import com.example.adbremote.platform.PlatformFilePicker
 import com.example.adbremote.platform.PlatformFileSaver
 import com.example.adbremote.platform.saveTextFileAwait
@@ -22,6 +23,7 @@ fun AdbRemoteApp(
     controller: AdbController,
     fileSaver: PlatformFileSaver,
     filePicker: PlatformFilePicker,
+    clipboard: PlatformClipboard,
     modifier: Modifier = Modifier,
     systemAdbDeviceCount: Int = 0,
     onChangeSystemAdbDevice: () -> Unit = {}
@@ -149,6 +151,12 @@ fun AdbRemoteApp(
                     onClick = { selectedTab = 2 },
                     enabled = uiState.selectedDevice?.isConnected == true
                 )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                    label = { Text("Help") },
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 }
+                )
             }
         }
     ) { paddingValues ->
@@ -207,7 +215,13 @@ fun AdbRemoteApp(
                         }
                     },
                     isInstalling = isInstalling,
-                    onClearHistory = controller::clearHistory
+                    onClearHistory = controller::clearHistory,
+                    onCopyToClipboard = { text ->
+                        clipboard.copyToClipboard(text)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Copied to clipboard")
+                        }
+                    }
                 )
                 2 -> RcuScreen(
                     uiState = uiState,
@@ -215,6 +229,7 @@ fun AdbRemoteApp(
                         controller.executeCommand(tag.toAdbCommand())
                     }
                 )
+                3 -> HelpScreen()
             }
         }
     }

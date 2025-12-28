@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Blue background with rounded corners -->
+  <rect width="512" height="512" rx="90" fill="#1A73E8"/>
+
+  <!-- Android head (matching the Android app icon) -->
+  <g transform="translate(256, 290)">
+    <!-- Left antenna -->
+    <line x1="-70" y1="-115" x2="-100" y2="-175" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- Right antenna -->
+    <line x1="70" y1="-115" x2="100" y2="-175" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- Head (dome shape) -->
+    <path fill="#FFFFFF" d="M-130,-110 A130,130 0 0,1 130,-110 L130,0 L-130,0 Z"/>
+
+    <!-- Left eye -->
+    <circle cx="-55" cy="-55" r="16" fill="#1A73E8"/>
+
+    <!-- Right eye -->
+    <circle cx="55" cy="-55" r="16" fill="#1A73E8"/>
+  </g>
+</svg>

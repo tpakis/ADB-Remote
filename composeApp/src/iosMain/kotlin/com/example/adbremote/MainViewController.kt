@@ -7,6 +7,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
+import com.example.adbremote.platform.PlatformClipboardFactory
 import com.example.adbremote.platform.PlatformContext
 import com.example.adbremote.platform.PlatformCrypto
 import com.example.adbremote.platform.PlatformFilePickerFactory
@@ -36,6 +37,7 @@ fun MainViewController() = ComposeUIViewController {
     val platformContext = remember { PlatformContext() }
     val fileSaver = remember { PlatformFileSaverFactory.create(platformContext) }
     val filePicker = remember { PlatformFilePickerFactory.create(platformContext) }
+    val clipboard = remember { PlatformClipboardFactory.create(platformContext) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -48,7 +50,12 @@ fun MainViewController() = ComposeUIViewController {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            AdbRemoteApp(controller = controller, fileSaver = fileSaver, filePicker = filePicker)
+            AdbRemoteApp(
+                controller = controller,
+                fileSaver = fileSaver,
+                filePicker = filePicker,
+                clipboard = clipboard
+            )
         }
     }
 }

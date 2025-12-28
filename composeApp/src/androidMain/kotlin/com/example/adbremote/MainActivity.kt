@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.example.adbremote.platform.PlatformClipboardFactory
 import com.example.adbremote.platform.PlatformContext
 import com.example.adbremote.platform.PlatformCrypto
 import com.example.adbremote.platform.PlatformFilePickerFactory
@@ -44,8 +45,9 @@ class MainActivity : ComponentActivity() {
         val crypto = PlatformCrypto()
         controller = AdbController(scope, storage, keyStorage, crypto)
 
-        // Create file saver using factory (requires context for Android)
+        // Create file saver and clipboard using factory (requires context for Android)
         val fileSaver = PlatformFileSaverFactory.create(platformContext)
+        val clipboard = PlatformClipboardFactory.create(platformContext)
 
         setContent {
             // State to hold the pending callback for file picker
@@ -73,7 +75,12 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     controller?.let { ctrl ->
-                        AdbRemoteApp(controller = ctrl, fileSaver = fileSaver, filePicker = filePicker)
+                        AdbRemoteApp(
+                            controller = ctrl,
+                            fileSaver = fileSaver,
+                            filePicker = filePicker,
+                            clipboard = clipboard
+                        )
                     }
                 }
             }

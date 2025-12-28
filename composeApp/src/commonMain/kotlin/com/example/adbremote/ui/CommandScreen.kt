@@ -1,5 +1,7 @@
 package com.example.adbremote.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -177,6 +179,7 @@ fun CommandScreen(
     onInstallApk: () -> Unit,
     isInstalling: Boolean,
     onClearHistory: () -> Unit,
+    onCopyToClipboard: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var commandText by remember { mutableStateOf("") }
@@ -353,7 +356,10 @@ fun CommandScreen(
                 }
             } else {
                 items(uiState.commandHistory) { result ->
-                    CommandResultCard(result)
+                    CommandResultCard(
+                        result = result,
+                        onLongPress = { text -> onCopyToClipboard(text) }
+                    )
                 }
             }
         }
@@ -462,10 +468,22 @@ fun FileOperationCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CommandResultCard(result: CommandResult) {
+fun CommandResultCard(
+    result: CommandResult,
+    onLongPress: (String) -> Unit = {}
+) {
+    // Combine command and output for clipboard
+    val clipboardText = "${result.command}\n\n${result.output}"
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { },
+                onLongClick = { onLongPress(clipboardText) }
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (result.isError)
                 MaterialTheme.colorScheme.errorContainer

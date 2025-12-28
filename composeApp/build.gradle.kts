@@ -132,9 +132,14 @@ compose.desktop {
 
             macOS {
                 bundleID = "com.example.adbremote"
+                iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
             }
             linux {
                 packageName = "adb-remote"
+                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
+            }
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
             }
         }
     }

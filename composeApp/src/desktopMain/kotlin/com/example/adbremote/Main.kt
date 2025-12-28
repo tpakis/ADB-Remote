@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.example.adbremote.platform.PlatformClipboardFactory
 import com.example.adbremote.platform.PlatformContext
 import com.example.adbremote.platform.PlatformCrypto
 import com.example.adbremote.platform.PlatformFilePickerFactory
@@ -47,6 +48,7 @@ fun main() = application {
         val platformContext = remember { PlatformContext() }
         val fileSaver = remember { PlatformFileSaverFactory.create(platformContext) }
         val filePicker = remember { PlatformFilePickerFactory.create(platformContext) }
+        val clipboard = remember { PlatformClipboardFactory.create(platformContext) }
 
         // System ADB detection state
         var systemAdbDevices by remember { mutableStateOf<List<SystemAdbDevice>>(emptyList()) }
@@ -95,6 +97,7 @@ fun main() = application {
                     controller = controller,
                     fileSaver = fileSaver,
                     filePicker = filePicker,
+                    clipboard = clipboard,
                     systemAdbDeviceCount = systemAdbDevices.size,
                     onChangeSystemAdbDevice = {
                         showSystemAdbDialog = true
