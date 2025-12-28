@@ -102,8 +102,8 @@ class AdbController(
         }
     }
 
-    fun addDevice(input: String) {
-        val device = AdbDevice.fromInput(input)
+    fun addDevice(input: String, displayName: String? = null) {
+        val device = AdbDevice.fromInput(input, displayName = displayName)
 
         if (device == null) {
             _uiState.update { it.copy(errorMessage = "Invalid device format. Use 'emulator-5554' or '192.168.1.100:5555'") }
@@ -126,6 +126,33 @@ class AdbController(
         }
 
         // Save after state is updated
+        saveDevices()
+    }
+
+    fun updateDevice(oldDevice: AdbDevice, updatedDevice: AdbDevice) {
+        _uiState.update { currentState ->
+            val updatedDevices = currentState.devices.map { device ->
+                if (device.host == oldDevice.host && device.port == oldDevice.port) {
+                    updatedDevice
+                } else {
+                    device
+                }
+            }
+
+            // Also update selectedDevice if it was the edited device
+            val updatedSelectedDevice = if (currentState.selectedDevice?.host == oldDevice.host &&
+                currentState.selectedDevice?.port == oldDevice.port) {
+                updatedDevice.copy(isConnected = currentState.selectedDevice?.isConnected ?: false)
+            } else {
+                currentState.selectedDevice
+            }
+
+            currentState.copy(
+                devices = updatedDevices,
+                selectedDevice = updatedSelectedDevice
+            )
+        }
+
         saveDevices()
     }
 

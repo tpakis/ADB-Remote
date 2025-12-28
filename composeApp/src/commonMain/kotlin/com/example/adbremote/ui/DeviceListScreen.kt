@@ -1,15 +1,18 @@
 package com.example.adbremote.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.adbremote.model.AdbDevice
 import com.example.adbremote.platform.DiscoveredDevice
@@ -18,9 +21,10 @@ import com.example.adbremote.viewmodel.AdbUiState
 @Composable
 fun DeviceListScreen(
     uiState: AdbUiState,
-    onAddDevice: (String) -> Unit,
+    onAddDevice: (String, String?) -> Unit,
     onRemoveDevice: (AdbDevice) -> Unit,
     onSelectDevice: (AdbDevice) -> Unit,
+    onEditDevice: (AdbDevice, AdbDevice) -> Unit,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onCancelConnection: () -> Unit,
@@ -31,6 +35,7 @@ fun DeviceListScreen(
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var deviceToEdit by remember { mutableStateOf<AdbDevice?>(null) }
 
     Column(
         modifier = modifier
@@ -276,7 +281,8 @@ fun DeviceListScreen(
                         device = device,
                         isSelected = uiState.selectedDevice == device,
                         onSelect = { onSelectDevice(device) },
-                        onRemove = { onRemoveDevice(device) }
+                        onRemove = { onRemoveDevice(device) },
+                        onEdit = { deviceToEdit = device }
                     )
                 }
             }
@@ -286,25 +292,41 @@ fun DeviceListScreen(
     if (showAddDialog) {
         AddDeviceDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { input ->
-                onAddDevice(input)
+            onAdd = { address, name ->
+                onAddDevice(address, name)
                 showAddDialog = false
+            }
+        )
+    }
+
+    deviceToEdit?.let { device ->
+        EditDeviceDialog(
+            device = device,
+            onDismiss = { deviceToEdit = null },
+            onSave = { updatedDevice ->
+                onEditDevice(device, updatedDevice)
+                deviceToEdit = null
             }
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DeviceCard(
     device: AdbDevice,
     isSelected: Boolean,
     onSelect: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onSelect),
+            .combinedClickable(
+                onClick = onSelect,
+                onLongClick = onEdit
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
                 MaterialTheme.colorScheme.secondaryContainer
@@ -320,15 +342,25 @@ fun DeviceCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = device.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "${device.host}:${device.port}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val displayName = device.displayName
+                if (!displayName.isNullOrBlank()) {
+                    // Show name as title, host:port as subtitle
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "${device.host}:${device.port}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // Show only host:port as title
+                    Text(
+                        text = "${device.host}:${device.port}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
 
             Row {
@@ -352,15 +384,26 @@ fun DeviceCard(
 @Composable
 fun AddDeviceDialog(
     onDismiss: () -> Unit,
-    onAdd: (String) -> Unit
+    onAdd: (String, String?) -> Unit
 ) {
     var deviceInput by remember { mutableStateOf("") }
+    var deviceName by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Device") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Optional device name
+                OutlinedTextField(
+                    value = deviceName,
+                    onValueChange = { deviceName = it },
+                    label = { Text("Device Name (optional)") },
+                    placeholder = { Text("e.g., Living Room TV") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 // Quick add buttons for host emulators
                 Text(
                     text = "Connect to Host Emulator (from this emulator/device)",
@@ -416,12 +459,92 @@ fun AddDeviceDialog(
             TextButton(
                 onClick = {
                     if (deviceInput.isNotBlank()) {
-                        onAdd(deviceInput.trim())
+                        onAdd(deviceInput.trim(), deviceName.trim().takeIf { it.isNotBlank() })
                     }
                 },
                 enabled = deviceInput.isNotBlank()
             ) {
                 Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditDeviceDialog(
+    device: AdbDevice,
+    onDismiss: () -> Unit,
+    onSave: (AdbDevice) -> Unit
+) {
+    var deviceName by remember { mutableStateOf(device.displayName ?: "") }
+    var host by remember { mutableStateOf(device.host) }
+    var portText by remember { mutableStateOf(device.port.toString()) }
+
+    val isValid = host.isNotBlank() && portText.toIntOrNull() != null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Device") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = deviceName,
+                    onValueChange = { deviceName = it },
+                    label = { Text("Device Name (optional)") },
+                    placeholder = { Text("e.g., Living Room TV") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = { Text("Host / IP Address") },
+                    placeholder = { Text("192.168.1.100") },
+                    singleLine = true,
+                    isError = host.isBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = portText,
+                    onValueChange = { portText = it },
+                    label = { Text("Port") },
+                    placeholder = { Text("5555") },
+                    singleLine = true,
+                    isError = portText.toIntOrNull() == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = "Long-press a device to edit it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val port = portText.toIntOrNull() ?: device.port
+                    val updatedDevice = device.copy(
+                        displayName = deviceName.trim().takeIf { it.isNotBlank() },
+                        host = host.trim(),
+                        port = port,
+                        name = "${host.trim()}:$port"
+                    )
+                    onSave(updatedDevice)
+                },
+                enabled = isValid
+            ) {
+                Text("Save")
             }
         },
         dismissButton = {

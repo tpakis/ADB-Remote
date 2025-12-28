@@ -154,9 +154,10 @@ fun AdbRemoteApp(
             when (selectedTab) {
                 0 -> DeviceListScreen(
                     uiState = uiState,
-                    onAddDevice = controller::addDevice,
+                    onAddDevice = { address, name -> controller.addDevice(address, name) },
                     onRemoveDevice = controller::removeDevice,
                     onSelectDevice = controller::selectDevice,
+                    onEditDevice = controller::updateDevice,
                     onConnect = controller::connect,
                     onDisconnect = controller::disconnect,
                     onCancelConnection = controller::cancelConnection,

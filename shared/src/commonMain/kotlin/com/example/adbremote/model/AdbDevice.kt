@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AdbDevice(
     val name: String,
+    val displayName: String? = null,
     val host: String,
     val port: Int = 5555,
     val isConnected: Boolean = false,
@@ -19,7 +20,7 @@ data class AdbDevice(
          * Note: When connecting from an emulator to the host machine's emulators,
          * use the special syntax "emulator-5554@host" which will use 10.0.2.2
          */
-        fun fromEmulatorSerial(serial: String, useHost: Boolean = false): AdbDevice? {
+        fun fromEmulatorSerial(serial: String, useHost: Boolean = false, displayName: String? = null): AdbDevice? {
             val emulatorPattern = Regex("emulator-(\\d+)(?:@host)?")
             val match = emulatorPattern.matchEntire(serial.trim())
 
@@ -33,6 +34,7 @@ data class AdbDevice(
 
                     AdbDevice(
                         name = if (shouldUseHost) "$serial (via host)" else serial,
+                        displayName = displayName?.takeIf { it.isNotBlank() },
                         host = host,
                         port = adbPort,
                         isEmulator = true
@@ -48,13 +50,18 @@ data class AdbDevice(
         /**
          * Create a device from host:port string
          */
-        fun fromHostPort(input: String, defaultPort: Int = 5555): AdbDevice? {
+        fun fromHostPort(input: String, defaultPort: Int = 5555, displayName: String? = null): AdbDevice? {
             val parts = input.trim().split(":")
             return when (parts.size) {
                 1 -> {
                     val host = parts[0].trim()
                     if (host.isNotEmpty()) {
-                        AdbDevice(name = "$host:$defaultPort", host = host, port = defaultPort)
+                        AdbDevice(
+                            name = "$host:$defaultPort",
+                            displayName = displayName?.takeIf { it.isNotBlank() },
+                            host = host,
+                            port = defaultPort
+                        )
                     } else {
                         null
                     }
@@ -63,7 +70,12 @@ data class AdbDevice(
                     val host = parts[0].trim()
                     val port = parts[1].trim().toIntOrNull() ?: defaultPort
                     if (host.isNotEmpty()) {
-                        AdbDevice(name = "$host:$port", host = host, port = port)
+                        AdbDevice(
+                            name = "$host:$port",
+                            displayName = displayName?.takeIf { it.isNotBlank() },
+                            host = host,
+                            port = port
+                        )
                     } else {
                         null
                     }
@@ -75,16 +87,16 @@ data class AdbDevice(
         /**
          * Parse input and create appropriate device (emulator or IP-based)
          */
-        fun fromInput(input: String, defaultPort: Int = 5555): AdbDevice? {
+        fun fromInput(input: String, defaultPort: Int = 5555, displayName: String? = null): AdbDevice? {
             val trimmed = input.trim()
 
             // Check if it's an emulator serial
             if (trimmed.startsWith("emulator-")) {
-                return fromEmulatorSerial(trimmed)
+                return fromEmulatorSerial(trimmed, displayName = displayName)
             }
 
             // Otherwise treat as host:port
-            return fromHostPort(trimmed, defaultPort)
+            return fromHostPort(trimmed, defaultPort, displayName)
         }
     }
 }
