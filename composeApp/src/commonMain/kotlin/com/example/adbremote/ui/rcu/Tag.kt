@@ -65,7 +65,7 @@ enum class Tag(val keycode: Int) {
     BLUE(186),          // KEYCODE_PROG_BLUE
 
     // Apps and search
-    APPS(0),            // Custom - will launch apps menu via shell command
+    APPS(284),          // KEYCODE_ALL_APPS
     SEARCH(84),         // KEYCODE_SEARCH
     ASSISTANT(231),     // KEYCODE_VOICE_ASSIST
 
@@ -84,7 +84,6 @@ enum class Tag(val keycode: Int) {
      */
     fun toAdbCommand(): String {
         return when (this) {
-            APPS -> "am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER"
             NETFLIX -> "am start -n com.netflix.ninja/.MainActivity"
             YOUTUBE -> "am start -n com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity"
             PRIME_VIDEO -> "am start -n com.amazon.amazonvideo.livingroom/com.amazon.ignition.IgnitionActivity"
