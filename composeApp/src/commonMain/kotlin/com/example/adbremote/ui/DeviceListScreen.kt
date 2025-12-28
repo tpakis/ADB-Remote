@@ -32,6 +32,8 @@ fun DeviceListScreen(
     onStartScan: () -> Unit = {},
     onStopScan: () -> Unit = {},
     onAddDiscoveredDevice: (DiscoveredDevice) -> Unit = {},
+    systemAdbDeviceCount: Int = 0,
+    onChangeSystemAdbDevice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -112,8 +114,18 @@ fun DeviceListScreen(
                                 Text("Cancel")
                             }
                         } else if (device.isConnected) {
-                            Button(onClick = onDisconnect) {
-                                Text("Disconnect")
+                            if (device.isSystemAdb) {
+                                // System ADB device - show Change button or disabled state
+                                Button(
+                                    onClick = onChangeSystemAdbDevice,
+                                    enabled = systemAdbDeviceCount > 1
+                                ) {
+                                    Text(if (systemAdbDeviceCount > 1) "Change" else "Connected")
+                                }
+                            } else {
+                                Button(onClick = onDisconnect) {
+                                    Text("Disconnect")
+                                }
                             }
                         } else {
                             Button(onClick = onConnect) {

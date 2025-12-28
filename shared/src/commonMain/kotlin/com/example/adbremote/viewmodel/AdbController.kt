@@ -10,6 +10,8 @@ import com.example.adbremote.platform.NetworkScanner
 import com.example.adbremote.platform.PlatformCrypto
 import com.example.adbremote.platform.PlatformLogger
 import com.example.adbremote.platform.PlatformStorage
+import com.example.adbremote.platform.SystemAdb
+import com.example.adbremote.platform.SystemAdbDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,9 @@ class AdbController(
     private val deviceRepository: DeviceRepository
     private val networkScanner = NetworkScanner()
     private var scanJob: Job? = null
+
+    // System ADB support (desktop only)
+    private val systemAdb = SystemAdb()
 
     companion object {
         private const val TAG = "AdbController"
@@ -294,6 +299,15 @@ class AdbController(
             .removePrefix("adb shell")
             .trim()
 
+        val device = _uiState.value.selectedDevice
+
+        // Check if using system ADB
+        if (device?.isSystemAdb == true && device.systemAdbSerial != null) {
+            executeSystemAdbCommand(device.systemAdbSerial, sanitizedCommand)
+            return
+        }
+
+        // Otherwise use custom protocol
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
             PlatformLogger.w(TAG, "Connection is dead, updating UI state")
@@ -355,6 +369,63 @@ class AdbController(
         }
     }
 
+    /**
+     * Execute a command via system ADB.
+     */
+    private fun executeSystemAdbCommand(serial: String, command: String) {
+        scope.launch {
+            _uiState.update { it.copy(isExecuting = true, errorMessage = null) }
+
+            try {
+                val result = systemAdb.executeCommand(serial, command)
+
+                result.fold(
+                    onSuccess = { output ->
+                        // Save successful command to recent commands
+                        scope.launch {
+                            deviceRepository.addRecentCommand(command)
+                            val updatedRecentCommands = deviceRepository.loadRecentCommands()
+                            _uiState.update { it.copy(recentCommands = updatedRecentCommands) }
+                        }
+
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                isExecuting = false,
+                                commandHistory = currentState.commandHistory + CommandResult(
+                                    command = command,
+                                    output = output.ifEmpty { "(no output)" }
+                                )
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                isExecuting = false,
+                                commandHistory = currentState.commandHistory + CommandResult(
+                                    command = command,
+                                    output = error.message ?: "Unknown error",
+                                    isError = true
+                                )
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isExecuting = false,
+                        commandHistory = currentState.commandHistory + CommandResult(
+                            command = command,
+                            output = e.message ?: "Unknown error",
+                            isError = true
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -373,6 +444,14 @@ class AdbController(
             .removePrefix("adb shell")
             .trim()
 
+        val device = _uiState.value.selectedDevice
+
+        // Check if using system ADB
+        if (device?.isSystemAdb == true && device.systemAdbSerial != null) {
+            return systemAdb.executeCommand(device.systemAdbSerial, sanitizedCommand)
+        }
+
+        // Otherwise use custom protocol
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
             handleConnectionLost()
@@ -447,12 +526,75 @@ class AdbController(
         _uiState.update { it.copy(discoveredDevices = emptyList()) }
     }
 
+    // ==================== System ADB Support (Desktop Only) ====================
+
+    /**
+     * Check if the system ADB is available.
+     */
+    fun isSystemAdbAvailable(): Boolean = systemAdb.isAvailable()
+
+    /**
+     * Get devices connected via the system ADB server.
+     * Only returns devices in "device" state (online and authorized).
+     */
+    suspend fun getSystemAdbDevices(): List<SystemAdbDevice> {
+        return if (systemAdb.isAvailable()) {
+            systemAdb.getConnectedDevices().filter { it.state == "device" }
+        } else {
+            emptyList()
+        }
+    }
+
+    /**
+     * Select a system ADB device for command execution.
+     * System ADB devices are already connected, so no connection step is needed.
+     */
+    fun selectSystemAdbDevice(device: SystemAdbDevice) {
+        // Disconnect any existing custom protocol connection
+        disconnect()
+
+        val adbDevice = AdbDevice(
+            name = device.serial,
+            displayName = device.model,
+            host = device.serial,  // Use serial as identifier
+            port = 0,              // Not used for system ADB
+            isConnected = true,    // System ADB devices are already connected
+            isEmulator = device.serial.startsWith("emulator-"),
+            isSystemAdb = true,
+            systemAdbSerial = device.serial
+        )
+
+        _uiState.update { it.copy(selectedDevice = adbDevice, commandHistory = emptyList()) }
+        PlatformLogger.i(TAG, "Selected system ADB device: ${device.serial} (${device.model ?: "unknown model"})")
+    }
+
+    /**
+     * Disconnect from a system ADB device (just clears the selection).
+     */
+    fun disconnectSystemAdb() {
+        val device = _uiState.value.selectedDevice
+        if (device?.isSystemAdb == true) {
+            _uiState.update { it.copy(selectedDevice = device.copy(isConnected = false)) }
+        }
+    }
+
+    // ==================== End System ADB Support ====================
+
     /**
      * Execute a bugreport command and return the binary zip data.
      * Bugreport can take several minutes to complete.
      * @return Result with the zip file bytes or error
      */
     suspend fun executeBugreport(): Result<ByteArray> {
+        val device = _uiState.value.selectedDevice
+
+        // Check if using system ADB
+        if (device?.isSystemAdb == true && device.systemAdbSerial != null) {
+            PlatformLogger.i(TAG, "Starting bugreport via system ADB - this may take several minutes...")
+            return systemAdb.executeCommandBinary(device.systemAdbSerial, "bugreport")
+        }
+
+        // Otherwise use custom protocol
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
             handleConnectionLost()
@@ -469,11 +611,21 @@ class AdbController(
 
     /**
      * Install an APK file on the remote device.
-     * This pushes the file to the device first, then runs pm install.
+     * For system ADB: uses "adb install" command directly.
+     * For custom protocol: pushes the file first, then runs pm install.
      * @param localPath The local path of the APK file
      * @return Result with success message or error
      */
     suspend fun installApk(localPath: String): Result<String> {
+        val device = _uiState.value.selectedDevice
+
+        // Check if using system ADB - can use direct adb install
+        if (device?.isSystemAdb == true && device.systemAdbSerial != null) {
+            PlatformLogger.i(TAG, "Installing APK via system ADB: $localPath")
+            return systemAdb.installApk(device.systemAdbSerial, localPath)
+        }
+
+        // Otherwise use custom protocol with push + pm install
         val connection = currentConnection
         if (connection == null || !connection.isConnected()) {
             handleConnectionLost()

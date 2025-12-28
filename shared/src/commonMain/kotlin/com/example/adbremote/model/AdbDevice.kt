@@ -9,7 +9,9 @@ data class AdbDevice(
     val host: String,
     val port: Int = 5555,
     val isConnected: Boolean = false,
-    val isEmulator: Boolean = false
+    val isEmulator: Boolean = false,
+    val isSystemAdb: Boolean = false,       // True if using system adb command
+    val systemAdbSerial: String? = null     // Serial for system adb commands (e.g., "emulator-5554")
 ) {
     companion object {
         /**
