@@ -50,7 +50,7 @@ TV remote control interface for Android TV devices:
 
 ### Android
 
-1. Download the latest `ADB Remote-x.x.x.apk` from the [Releases](https://github.com/user/android-adb/releases) page
+1. Download the latest `ADB Remote-x.x.x.apk` from the [Releases](https://github.com/tpakis/ADB-Remote/releases) page
 2. Transfer the APK to your Android device
 3. Enable **"Install from unknown sources"** in your device settings if prompted
 4. Open the APK file to install
@@ -60,7 +60,7 @@ TV remote control interface for Android TV devices:
 
 #### Option 1: DMG Installer (Recommended)
 
-1. Download the latest `ADB Remote-x.x.x.dmg` from the [Releases](https://github.com/user/android-adb/releases) page
+1. Download the latest `ADB Remote-x.x.x.dmg` from the [Releases](https://github.com/tpakis/ADB-Remote/releases) page
 2. Open the DMG file
 3. Drag "ADB Remote" to your Applications folder
 4. **Important**: Since the app is not signed with an Apple Developer certificate, you need to allow it to run:

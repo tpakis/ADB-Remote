@@ -42,6 +42,11 @@ val predefinedCommands = listOf(
         name = "Accessibility",
         commands = listOf(
             PredefinedCommand(
+                name = "Open Accessibility Settings",
+                command = "am start -a android.settings.ACCESSIBILITY_SETTINGS",
+                description = "Open device accessibility settings menu"
+            ),
+            PredefinedCommand(
                 name = "Enable TalkBack",
                 command = "settings put secure enabled_accessibility_services com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService",
                 description = "Enable screen reader"

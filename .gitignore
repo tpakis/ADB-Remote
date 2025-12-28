@@ -18,6 +18,9 @@ out/
 *.iml
 *.ipr
 *.iws
+
+# Xcode user data
+xcuserdata/
 .project
 .settings
 .classpath
