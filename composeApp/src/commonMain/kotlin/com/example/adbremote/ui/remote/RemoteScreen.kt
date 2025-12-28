@@ -1,5 +1,9 @@
 package com.example.adbremote.ui.remote
 
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.adbremote.ui.components.*
 import com.example.adbremote.ui.rcu.*
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 typealias StyleDimensions = Pair<Dp, Dp>
@@ -26,10 +32,19 @@ fun RemoteScreen(
     callback: (Tag) -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
             .padding(16.dp)
+            .draggable(
+                orientation = Orientation.Vertical,
+                state = rememberDraggableState { delta ->
+                    coroutineScope.launch {
+                        scrollState.scrollBy(-delta)
+                    }
+                }
+            )
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

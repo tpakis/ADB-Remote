@@ -6,7 +6,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.example.adbremote.platform.PlatformContext
@@ -26,7 +28,7 @@ fun main() = application {
     // Initialize platform
     initializePlatform(PlatformContext())
 
-    val windowState = rememberWindowState()
+    val windowState = rememberWindowState(width = 650.dp, height = 1400.dp)
 
     Window(
         onCloseRequest = ::exitApplication,

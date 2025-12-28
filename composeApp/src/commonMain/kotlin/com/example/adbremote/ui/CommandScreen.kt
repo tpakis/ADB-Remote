@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.adbremote.model.CommandResult
 import com.example.adbremote.viewmodel.AdbUiState
@@ -371,6 +374,15 @@ fun CommandScreen(
                 enabled = !uiState.isExecuting,
                 singleLine = true,
                 modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (commandText.isNotBlank()) {
+                            onExecuteCommand(commandText)
+                            commandText = ""
+                        }
+                    }
+                ),
                 trailingIcon = {
                     if (uiState.isExecuting) {
                         CircularProgressIndicator(
