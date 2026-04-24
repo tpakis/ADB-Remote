@@ -130,6 +130,11 @@ val predefinedCommands = listOf(
                 name = "Force ANR",
                 command = "am broadcast -a debug.ANR",
                 description = "Debug/QA builds, via service start timeout"
+            ),
+            PredefinedCommand(
+                name = "System Settings",
+                command = "am start -a android.settings.SETTINGS",
+                description = "Open device system settings"
             )
         )
     ),
@@ -259,6 +264,10 @@ fun CommandScreen(
             QuickCommandChip(
                 label = "Top Processes",
                 onClick = { onExecuteCommand("top -n 1") }
+            )
+            QuickCommandChip(
+                label = "System Settings",
+                onClick = { onExecuteCommand("am start -a android.settings.SETTINGS") }
             )
             // Install APK chip
             AssistChip(

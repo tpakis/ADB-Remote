@@ -34,6 +34,7 @@ fun DeviceListScreen(
     onAddDiscoveredDevice: (DiscoveredDevice) -> Unit = {},
     systemAdbDeviceCount: Int = 0,
     onChangeSystemAdbDevice: () -> Unit = {},
+    onScanLocalAdb: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -150,6 +151,18 @@ fun DeviceListScreen(
                 style = MaterialTheme.typography.titleLarge
             )
             Row {
+                // Local ADB button (desktop only, passed as non-null callback)
+                if (onScanLocalAdb != null) {
+                    TextButton(onClick = onScanLocalAdb) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Local ADB")
+                    }
+                }
                 // Scan button
                 if (uiState.isScanning) {
                     TextButton(onClick = onStopScan) {

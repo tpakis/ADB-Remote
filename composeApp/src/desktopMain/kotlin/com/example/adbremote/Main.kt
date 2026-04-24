@@ -24,6 +24,7 @@ import com.example.adbremote.viewmodel.AdbController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 fun main() = application {
     // Initialize platform
@@ -93,6 +94,7 @@ fun main() = application {
                 }
 
                 // Main app content
+                val coroutineScope = rememberCoroutineScope()
                 AdbRemoteApp(
                     controller = controller,
                     fileSaver = fileSaver,
@@ -101,6 +103,17 @@ fun main() = application {
                     systemAdbDeviceCount = systemAdbDevices.size,
                     onChangeSystemAdbDevice = {
                         showSystemAdbDialog = true
+                    },
+                    onScanLocalAdb = {
+                        coroutineScope.launch {
+                            if (controller.isSystemAdbAvailable()) {
+                                val devices = controller.getSystemAdbDevices()
+                                if (devices.isNotEmpty()) {
+                                    systemAdbDevices = devices
+                                    showSystemAdbDialog = true
+                                }
+                            }
+                        }
                     }
                 )
             }

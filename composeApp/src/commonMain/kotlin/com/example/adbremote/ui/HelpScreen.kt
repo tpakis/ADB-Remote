@@ -121,6 +121,18 @@ The scanner checks for devices with port 5555 open. Discovered devices can be ad
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Local ADB (Desktop)
+        HelpCard(
+            title = "Local ADB (Desktop Only)",
+            content = """On the desktop app, the "Local ADB" button on the Devices tab detects devices already connected to your computer's ADB server (via USB or emulator).
+
+Tap the button to scan for locally connected devices. A dialog will list all available devices — select one to start using it directly. If you are already connected to another device (via network or local ADB), it will be disconnected automatically.
+
+This is the same check that runs when the desktop app starts."""
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Tabs Overview
         Text(
             text = "App Features",

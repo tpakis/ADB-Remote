@@ -26,7 +26,8 @@ fun AdbRemoteApp(
     clipboard: PlatformClipboard,
     modifier: Modifier = Modifier,
     systemAdbDeviceCount: Int = 0,
-    onChangeSystemAdbDevice: () -> Unit = {}
+    onChangeSystemAdbDevice: () -> Unit = {},
+    onScanLocalAdb: (() -> Unit)? = null
 ) {
     val uiState by controller.uiState.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
@@ -176,7 +177,8 @@ fun AdbRemoteApp(
                     onStopScan = controller::stopScan,
                     onAddDiscoveredDevice = controller::addDiscoveredDevice,
                     systemAdbDeviceCount = systemAdbDeviceCount,
-                    onChangeSystemAdbDevice = onChangeSystemAdbDevice
+                    onChangeSystemAdbDevice = onChangeSystemAdbDevice,
+                    onScanLocalAdb = onScanLocalAdb
                 )
                 1 -> CommandScreen(
                     uiState = uiState,
